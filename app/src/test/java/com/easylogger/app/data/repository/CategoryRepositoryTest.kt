@@ -69,6 +69,9 @@ class FakeCategoryDao : CategoryDao {
         }
     }
 
+    override suspend fun getNextSortOrder(): Int =
+        (categories.maxOfOrNull { it.sortOrder } ?: -1) + 1
+
     override suspend fun getById(id: Long): Category? = categories.find { it.id == id }
 
     override suspend fun insert(category: Category): Long {
@@ -84,6 +87,14 @@ class FakeCategoryDao : CategoryDao {
             categories[idx] = category
             flow.value = categories.toList()
         }
+    }
+
+    override suspend fun updateAll(categories: List<Category>) {
+        for (updated in categories) {
+            val idx = this.categories.indexOfFirst { it.id == updated.id }
+            if (idx >= 0) this.categories[idx] = updated
+        }
+        flow.value = this.categories.toList()
     }
 
     override suspend fun getAllList(): List<Category> = categories.toList()

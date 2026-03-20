@@ -26,6 +26,9 @@ interface CategoryDao {
     )
     fun getAllWithLastLog(): Flow<List<CategoryWithLastLog>>
 
+    @Query("SELECT COALESCE(MAX(sortOrder), -1) + 1 FROM categories")
+    suspend fun getNextSortOrder(): Int
+
     @Query("SELECT * FROM categories WHERE id = :id")
     suspend fun getById(id: Long): Category?
 
@@ -37,6 +40,9 @@ interface CategoryDao {
 
     @Query("SELECT * FROM categories ORDER BY name ASC")
     suspend fun getAllList(): List<Category>
+
+    @Update
+    suspend fun updateAll(categories: List<Category>)
 
     @Delete
     suspend fun delete(category: Category)
