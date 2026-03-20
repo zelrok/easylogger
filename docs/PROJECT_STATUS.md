@@ -58,13 +58,15 @@ Export: CsvExporter → Storage Access Framework (no permissions needed)
 | Cascade delete (category → entries) | Done | Foreign key onDelete CASCADE |
 | Paging (50 items/page) | Done | Paging 3 PagingSource on LogEntryDao |
 | CSV export via SAF | Done | UTF-8 BOM, ISO 8601 timestamps, proper escaping |
-| Empty states | Done | Both screens |
+| Empty states | Done | Both screens + empty folder view |
 | Material 3 + dynamic color | Done | Light/dark themes, Android 12+ dynamic color |
 | Adaptive app icons | Done | Present in mipmap resources |
+| Drag-to-reorder categories | Done | Long-press to drag, both list/grid, `sh.calvin.reorderable` v2.4.2 |
+| Category folders | Done | Create/edit/delete folders, drag categories into folders, folder-interior reorder, "Remove from Folder" context menu, + button is folder-aware |
 
 ---
 
-## File Layout (35 Kotlin source files)
+## File Layout (46 Kotlin source files)
 
 ```
 app/src/main/java/com/easylogger/app/
@@ -72,18 +74,21 @@ app/src/main/java/com/easylogger/app/
 ├── MainActivity.kt               # Single Activity, handles CSV export result
 ├── data/
 │   ├── local/
-│   │   ├── AppDatabase.kt        # Room DB v1 (3 entities)
-│   │   ├── dao/                   # CategoryDao, LogEntryDao, UserPreferenceDao
-│   │   └── entity/                # Category, LogEntry, UserPreference, CategoryWithLastLog
-│   └── repository/                # CategoryRepository, LogEntryRepository, UserPreferenceRepository
+│   │   ├── AppDatabase.kt        # Room DB v2 (4 entities: categories, log_entries, user_preferences, folders)
+│   │   ├── Migrations.kt         # Room migration v1→v2 (adds folders table + folderId/folderSortOrder to categories)
+│   │   ├── dao/                   # CategoryDao, LogEntryDao, UserPreferenceDao, FolderDao
+│   │   └── entity/                # Category, LogEntry, UserPreference, CategoryWithLastLog, Folder, FolderWithCount
+│   └── repository/                # CategoryRepository, LogEntryRepository, UserPreferenceRepository, FolderRepository
 ├── di/
-│   └── DatabaseModule.kt         # Hilt module
+│   └── DatabaseModule.kt         # Hilt module (provides all DAOs + migration)
 ├── export/
 │   └── CsvExporter.kt            # CSV generation
 └── ui/
     ├── components/EmptyState.kt
     ├── detail/                    # DetailScreen, LogDetailViewModel, LogEntryItem, DateTimePickerDialog, DeleteEntryDialog
-    ├── main/                      # MainScreen, CategoryListViewModel, CategoryListItem, CategoryGridCard, AddEditCategoryDialog, DeleteCategoryDialog
+    ├── main/                      # MainScreen, CategoryListViewModel, MainListItem (sealed interface),
+    │                              # CategoryListItem, CategoryGridCard, AddEditCategoryDialog, DeleteCategoryDialog,
+    │                              # FolderListItem, FolderGridCard, AddEditFolderDialog
     ├── navigation/                # AppNavHost, NavRoutes
     └── theme/                     # Theme, Color, Type
 ```
@@ -94,7 +99,7 @@ app/src/main/java/com/easylogger/app/
 
 | Type | Count | Coverage |
 |---|---|---|
-| Unit (JVM) | 5 files | CategoryRepository, LogEntryRepository, UserPreferenceRepository, CategoryListViewModel, LogDetailViewModel |
+| Unit (JVM) | 6 files | CategoryRepository, FolderRepository, LogEntryRepository, UserPreferenceRepository, CategoryListViewModel, LogDetailViewModel |
 | Instrumented (Android) | 3 files | CategoryDao, LogEntryDao, UserPreferenceDao |
 | Test utilities | Fake DAO implementations, coroutine test dispatchers, Turbine for Flow testing |
 
@@ -113,8 +118,6 @@ Based on comparing spec details against the code:
 5. **Grid responsiveness (tablet columns)** — spec says 3-4 columns on tablets; verify adaptive column count.
 6. **Grid long-press context menu** — spec mentions long-press as alternative to overflow icon on grid cards.
 7. **"Add" card styling** — spec says dashed border in list mode, "+" card in grid; verify visual match.
-8. **Drag-to-reorder** — listed as "Future" in spec section 8, NOT a v1.0 requirement.
-
 These are minor UI polish items, not missing features. Core functionality is complete.
 
 ---
@@ -128,7 +131,6 @@ These are minor UI polish items, not missing features. Core functionality is com
 - CSV import
 - Category grouping / color-coding
 - Home screen widget
-- Drag-to-reorder
 
 ---
 
@@ -148,6 +150,16 @@ These are minor UI polish items, not missing features. Core functionality is com
 ---
 
 ## Changelog
+
+### v1.1+ (2026-03-20) — feature/category-folders merged to main
+- **New feature: Category folders.** Users can create folders from the top app bar, drag categories into folders, navigate into folders, reorder within folders, and remove categories from folders via context menu. The + button creates categories inside the current folder when in folder view.
+  - Data: New `Folder` entity, `FolderWithCount` DTO, `FolderDao`, `FolderRepository`. Category entity gained `folderId` (FK, SET_NULL) and `folderSortOrder`. Room migration v1→v2. Index on `folderId`.
+  - UI: New `FolderListItem`, `FolderGridCard`, `AddEditFolderDialog`, `MainListItem` sealed interface. `CategoryListItem`/`CategoryGridCard` gained "Remove from Folder" menu. `MainScreen` fully reworked for mixed folder+category rendering with `BackHandler` for folder navigation.
+  - ViewModel: `CategoryListViewModel` reworked — mixed top-level state (`MainListItem`), folder interior state, folder-aware reorder with drop-into-folder detection, folder-aware category creation.
+  - Tests: `FakeFolderDao`, `FolderRepositoryTest`, updated `FakeCategoryDao` and `CategoryListViewModelTest`.
+
+### v1.1+ (2026-03-20) — feature/drag-to-reorder-categories merged to main
+- **New feature: Drag-to-reorder categories.** Long-press to drag in both list/grid modes. Uses `sh.calvin.reorderable` v2.4.2. Optimistic UI with Room persistence on drop.
 
 ### v1.1 (2026-03-20) — versionCode 2
 - **Bug fix: DateTimePickerDialog UTC/local timezone mismatch.** When editing an existing log entry, the date portion always showed today's date instead of the entry's actual date. Root cause: Material 3 DatePicker operates in UTC, but the code was passing local-timezone millis as `initialSelectedDateMillis` and reading `selectedDateMillis` back into a local Calendar without timezone conversion. Fix normalizes to UTC midnight on init and extracts UTC year/month/day when combining with the user's chosen time. File changed: `app/src/main/java/com/easylogger/app/ui/detail/DateTimePickerDialog.kt`.

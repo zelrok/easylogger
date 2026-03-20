@@ -3,7 +3,9 @@ package com.easylogger.app.di
 import android.content.Context
 import androidx.room.Room
 import com.easylogger.app.data.local.AppDatabase
+import com.easylogger.app.data.local.MIGRATION_1_2
 import com.easylogger.app.data.local.dao.CategoryDao
+import com.easylogger.app.data.local.dao.FolderDao
 import com.easylogger.app.data.local.dao.LogEntryDao
 import com.easylogger.app.data.local.dao.UserPreferenceDao
 import dagger.Module
@@ -24,7 +26,7 @@ object DatabaseModule {
             context,
             AppDatabase::class.java,
             "easylogger.db"
-        ).build()
+        ).addMigrations(MIGRATION_1_2).build()
     }
 
     @Provides
@@ -35,4 +37,7 @@ object DatabaseModule {
 
     @Provides
     fun provideUserPreferenceDao(database: AppDatabase): UserPreferenceDao = database.userPreferenceDao()
+
+    @Provides
+    fun provideFolderDao(database: AppDatabase): FolderDao = database.folderDao()
 }

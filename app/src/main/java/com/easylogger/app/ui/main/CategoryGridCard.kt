@@ -36,7 +36,8 @@ fun CategoryGridCard(
     onClick: () -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onRemoveFromFolder: (() -> Unit)? = null
 ) {
     var showMenu by remember { mutableStateOf(false) }
 
@@ -97,6 +98,15 @@ fun CategoryGridCard(
                             onDelete()
                         }
                     )
+                    if (onRemoveFromFolder != null) {
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.remove_from_folder)) },
+                            onClick = {
+                                showMenu = false
+                                onRemoveFromFolder()
+                            }
+                        )
+                    }
                 }
             }
         }
