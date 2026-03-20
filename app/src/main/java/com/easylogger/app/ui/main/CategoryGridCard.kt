@@ -35,12 +35,13 @@ fun CategoryGridCard(
     category: CategoryWithLastLog,
     onClick: () -> Unit,
     onEdit: () -> Unit,
-    onDelete: () -> Unit
+    onDelete: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
     var showMenu by remember { mutableStateOf(false) }
 
     Card(
-        modifier = Modifier
+        modifier = modifier
             .padding(4.dp)
             .fillMaxWidth()
             .heightIn(min = 120.dp)

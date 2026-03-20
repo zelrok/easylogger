@@ -9,6 +9,7 @@ import com.easylogger.app.data.repository.LogEntryRepository
 import com.easylogger.app.data.repository.UserPreferenceRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
@@ -38,12 +39,15 @@ class CategoryListViewModel @Inject constructor(
     private val _events = Channel<MainScreenEvent>(Channel.BUFFERED)
     val events = _events.receiveAsFlow()
 
+    private val _reorderedCategories = MutableStateFlow<List<CategoryWithLastLog>?>(null)
+
     val state: StateFlow<MainScreenState> = combine(
         categoryRepository.getAllWithLastLog(),
-        userPreferenceRepository.getViewMode()
-    ) { categories, viewMode ->
+        userPreferenceRepository.getViewMode(),
+        _reorderedCategories
+    ) { dbCategories, viewMode, reordered ->
         MainScreenState(
-            categories = categories,
+            categories = reordered ?: dbCategories,
             viewMode = viewMode,
             isLoading = false
         )
@@ -83,6 +87,29 @@ class CategoryListViewModel @Inject constructor(
                 UserPreferenceRepository.VIEW_MODE_LIST
             }
             userPreferenceRepository.setViewMode(newMode)
+        }
+    }
+
+    fun onReorder(fromIndex: Int, toIndex: Int) {
+        val current = state.value.categories.toMutableList()
+        val item = current.removeAt(fromIndex)
+        current.add(toIndex, item)
+        _reorderedCategories.value = current
+    }
+
+    fun onReorderConfirmed() {
+        val reordered = _reorderedCategories.value ?: return
+        viewModelScope.launch {
+            val updatedCategories = reordered.mapIndexed { index, cwl ->
+                Category(
+                    id = cwl.id,
+                    name = cwl.name,
+                    sortOrder = index,
+                    createdAt = cwl.createdAt
+                )
+            }
+            categoryRepository.updateSortOrders(updatedCategories)
+            _reorderedCategories.value = null
         }
     }
 

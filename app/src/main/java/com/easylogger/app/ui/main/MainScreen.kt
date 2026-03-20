@@ -1,6 +1,7 @@
 package com.easylogger.app.ui.main
 
 import androidx.compose.animation.Crossfade
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
@@ -9,7 +10,9 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.GridView
@@ -21,6 +24,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -34,6 +38,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -43,6 +48,9 @@ import com.easylogger.app.data.local.entity.Category
 import com.easylogger.app.data.local.entity.CategoryWithLastLog
 import com.easylogger.app.data.repository.UserPreferenceRepository
 import com.easylogger.app.ui.components.EmptyState
+import sh.calvin.reorderable.ReorderableItem
+import sh.calvin.reorderable.rememberReorderableLazyGridState
+import sh.calvin.reorderable.rememberReorderableLazyListState
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -141,32 +149,66 @@ fun MainScreen(
             if (state.categories.isEmpty() && !state.isLoading) {
                 EmptyState(message = stringResource(R.string.empty_state_message))
             } else if (viewMode == UserPreferenceRepository.VIEW_MODE_LIST) {
+                val lazyListState = rememberLazyListState()
+                val reorderableState = rememberReorderableLazyListState(lazyListState) { from, to ->
+                    viewModel.onReorder(from.index, to.index)
+                }
+
                 LazyColumn(
+                    state = lazyListState,
                     modifier = Modifier.fillMaxSize(),
                     contentPadding = PaddingValues(vertical = 8.dp)
                 ) {
                     items(state.categories, key = { it.id }) { category ->
-                        CategoryListItem(
-                            category = category,
-                            onClick = { onCategoryClick(category.id) },
-                            onEdit = { editingCategory = category },
-                            onDelete = { deletingCategory = category }
-                        )
+                        ReorderableItem(reorderableState, key = category.id) { isDragging ->
+                            val elevation by animateDpAsState(
+                                if (isDragging) 8.dp else 0.dp,
+                                label = "dragElevation"
+                            )
+                            CategoryListItem(
+                                category = category,
+                                onClick = { onCategoryClick(category.id) },
+                                onEdit = { editingCategory = category },
+                                onDelete = { deletingCategory = category },
+                                modifier = Modifier
+                                    .shadow(elevation)
+                                    .longPressDraggableHandle(
+                                        onDragStopped = { viewModel.onReorderConfirmed() }
+                                    )
+                            )
+                        }
                     }
                 }
             } else {
+                val lazyGridState = rememberLazyGridState()
+                val reorderableGridState = rememberReorderableLazyGridState(lazyGridState) { from, to ->
+                    viewModel.onReorder(from.index, to.index)
+                }
+
                 LazyVerticalGrid(
                     columns = GridCells.Adaptive(160.dp),
+                    state = lazyGridState,
                     modifier = Modifier.fillMaxSize(),
                     contentPadding = PaddingValues(8.dp)
                 ) {
                     items(state.categories, key = { it.id }) { category ->
-                        CategoryGridCard(
-                            category = category,
-                            onClick = { onCategoryClick(category.id) },
-                            onEdit = { editingCategory = category },
-                            onDelete = { deletingCategory = category }
-                        )
+                        ReorderableItem(reorderableGridState, key = category.id) { isDragging ->
+                            val elevation by animateDpAsState(
+                                if (isDragging) 8.dp else 1.dp,
+                                label = "dragElevation"
+                            )
+                            CategoryGridCard(
+                                category = category,
+                                onClick = { onCategoryClick(category.id) },
+                                onEdit = { editingCategory = category },
+                                onDelete = { deletingCategory = category },
+                                modifier = Modifier
+                                    .shadow(elevation, shape = MaterialTheme.shapes.medium)
+                                    .longPressDraggableHandle(
+                                        onDragStopped = { viewModel.onReorderConfirmed() }
+                                    )
+                            )
+                        }
                     }
                 }
             }
