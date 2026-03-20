@@ -17,6 +17,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.res.stringResource
 import com.easylogger.app.R
 import java.util.Calendar
+import java.util.TimeZone
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -33,10 +34,23 @@ fun DateTimePickerDialog(
         }
     }
 
+    // Material 3 DatePicker operates in UTC — convert local date to UTC midnight
+    val initialDateMillis = remember {
+        Calendar.getInstance(TimeZone.getTimeZone("UTC")).apply {
+            set(
+                calendar.get(Calendar.YEAR),
+                calendar.get(Calendar.MONTH),
+                calendar.get(Calendar.DAY_OF_MONTH),
+                0, 0, 0
+            )
+            set(Calendar.MILLISECOND, 0)
+        }.timeInMillis
+    }
+
     var showTimePicker by remember { mutableStateOf(false) }
 
     val datePickerState = rememberDatePickerState(
-        initialSelectedDateMillis = calendar.timeInMillis
+        initialSelectedDateMillis = initialDateMillis
     )
     val timePickerState = rememberTimePickerState(
         initialHour = calendar.get(Calendar.HOUR_OF_DAY),
@@ -67,9 +81,16 @@ fun DateTimePickerDialog(
             confirmButton = {
                 TextButton(
                     onClick = {
-                        val selectedDate = Calendar.getInstance().apply {
+                        // Extract year/month/day from the UTC-based date picker,
+                        // then combine with the user's chosen time in local timezone
+                        val utcDate = Calendar.getInstance(TimeZone.getTimeZone("UTC")).apply {
                             timeInMillis = datePickerState.selectedDateMillis
                                 ?: System.currentTimeMillis()
+                        }
+                        val selectedDate = Calendar.getInstance().apply {
+                            set(Calendar.YEAR, utcDate.get(Calendar.YEAR))
+                            set(Calendar.MONTH, utcDate.get(Calendar.MONTH))
+                            set(Calendar.DAY_OF_MONTH, utcDate.get(Calendar.DAY_OF_MONTH))
                             set(Calendar.HOUR_OF_DAY, timePickerState.hour)
                             set(Calendar.MINUTE, timePickerState.minute)
                             set(Calendar.SECOND, 0)
