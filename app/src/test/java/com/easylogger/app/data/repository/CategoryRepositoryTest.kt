@@ -9,7 +9,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -48,6 +48,23 @@ class CategoryRepositoryTest {
         val result = repository.getAll().first()
         assertTrue(result.isEmpty())
     }
+
+    @Test
+    fun `moveCategoryToFolder sets folderId`() = runTest {
+        fakeDao.insertDirect(Category(1, "A", 0, 100L))
+        repository.moveCategoryToFolder(1L, 5L)
+        val cat = fakeDao.categories.first { it.id == 1L }
+        assertEquals(5L, cat.folderId)
+    }
+
+    @Test
+    fun `removeCategoryFromFolder clears folderId`() = runTest {
+        fakeDao.insertDirect(Category(1, "A", 0, 100L, folderId = 5L, folderSortOrder = 2))
+        repository.removeCategoryFromFolder(1L)
+        val cat = fakeDao.categories.first { it.id == 1L }
+        assertNull(cat.folderId)
+        assertEquals(0, cat.folderSortOrder)
+    }
 }
 
 class FakeCategoryDao : CategoryDao {
@@ -62,15 +79,47 @@ class FakeCategoryDao : CategoryDao {
 
     override fun getAll(): Flow<List<Category>> = flow
 
-    @Suppress("UNCHECKED_CAST")
-    override fun getAllWithLastLog(): Flow<List<CategoryWithLastLog>> {
-        return flow.map { list ->
-            list.map { CategoryWithLastLog(it.id, it.name, it.sortOrder, it.createdAt, null) }
+    private fun mapToWithLastLog(list: List<Category>): List<CategoryWithLastLog> =
+        list.map {
+            CategoryWithLastLog(
+                it.id, it.name, it.sortOrder, it.createdAt, null,
+                it.folderId, it.folderSortOrder
+            )
+        }
+
+    override fun getAllWithLastLog(): Flow<List<CategoryWithLastLog>> =
+        flow.map { mapToWithLastLog(it) }
+
+    override fun getTopLevelWithLastLog(): Flow<List<CategoryWithLastLog>> =
+        flow.map { list -> mapToWithLastLog(list.filter { it.folderId == null }) }
+
+    override fun getCategoriesInFolder(folderId: Long): Flow<List<CategoryWithLastLog>> =
+        flow.map { list ->
+            mapToWithLastLog(list.filter { it.folderId == folderId }
+                .sortedBy { it.folderSortOrder })
+        }
+
+    override suspend fun getNextSortOrder(): Int =
+        (categories.filter { it.folderId == null }.maxOfOrNull { it.sortOrder } ?: -1) + 1
+
+    override suspend fun getNextFolderSortOrder(folderId: Long): Int =
+        (categories.filter { it.folderId == folderId }.maxOfOrNull { it.folderSortOrder } ?: -1) + 1
+
+    override suspend fun moveCategoryToFolder(categoryId: Long, folderId: Long, folderSortOrder: Int) {
+        val idx = categories.indexOfFirst { it.id == categoryId }
+        if (idx >= 0) {
+            categories[idx] = categories[idx].copy(folderId = folderId, folderSortOrder = folderSortOrder)
+            flow.value = categories.toList()
         }
     }
 
-    override suspend fun getNextSortOrder(): Int =
-        (categories.maxOfOrNull { it.sortOrder } ?: -1) + 1
+    override suspend fun removeCategoryFromFolder(categoryId: Long, newSortOrder: Int) {
+        val idx = categories.indexOfFirst { it.id == categoryId }
+        if (idx >= 0) {
+            categories[idx] = categories[idx].copy(folderId = null, folderSortOrder = 0, sortOrder = newSortOrder)
+            flow.value = categories.toList()
+        }
+    }
 
     override suspend fun getById(id: Long): Category? = categories.find { it.id == id }
 

@@ -18,7 +18,7 @@ interface CategoryDao {
 
     @Query(
         """
-        SELECT c.id, c.name, c.sortOrder, c.createdAt,
+        SELECT c.id, c.name, c.sortOrder, c.createdAt, c.folderId, c.folderSortOrder,
                (SELECT MAX(le.timestamp) FROM log_entries le WHERE le.categoryId = c.id) AS lastLogTimestamp
         FROM categories c
         ORDER BY c.sortOrder ASC, c.createdAt ASC
@@ -26,8 +26,47 @@ interface CategoryDao {
     )
     fun getAllWithLastLog(): Flow<List<CategoryWithLastLog>>
 
-    @Query("SELECT COALESCE(MAX(sortOrder), -1) + 1 FROM categories")
+    @Query(
+        """
+        SELECT c.id, c.name, c.sortOrder, c.createdAt, c.folderId, c.folderSortOrder,
+               (SELECT MAX(le.timestamp) FROM log_entries le WHERE le.categoryId = c.id) AS lastLogTimestamp
+        FROM categories c
+        WHERE c.folderId IS NULL
+        ORDER BY c.sortOrder ASC, c.createdAt ASC
+        """
+    )
+    fun getTopLevelWithLastLog(): Flow<List<CategoryWithLastLog>>
+
+    @Query(
+        """
+        SELECT c.id, c.name, c.sortOrder, c.createdAt, c.folderId, c.folderSortOrder,
+               (SELECT MAX(le.timestamp) FROM log_entries le WHERE le.categoryId = c.id) AS lastLogTimestamp
+        FROM categories c
+        WHERE c.folderId = :folderId
+        ORDER BY c.folderSortOrder ASC, c.createdAt ASC
+        """
+    )
+    fun getCategoriesInFolder(folderId: Long): Flow<List<CategoryWithLastLog>>
+
+    @Query(
+        """
+        SELECT COALESCE(MAX(sortOrder), -1) + 1 FROM (
+            SELECT sortOrder FROM categories WHERE folderId IS NULL
+            UNION ALL
+            SELECT sortOrder FROM folders
+        )
+        """
+    )
     suspend fun getNextSortOrder(): Int
+
+    @Query("SELECT COALESCE(MAX(folderSortOrder), -1) + 1 FROM categories WHERE folderId = :folderId")
+    suspend fun getNextFolderSortOrder(folderId: Long): Int
+
+    @Query("UPDATE categories SET folderId = :folderId, folderSortOrder = :folderSortOrder WHERE id = :categoryId")
+    suspend fun moveCategoryToFolder(categoryId: Long, folderId: Long, folderSortOrder: Int)
+
+    @Query("UPDATE categories SET folderId = NULL, folderSortOrder = 0, sortOrder = :newSortOrder WHERE id = :categoryId")
+    suspend fun removeCategoryFromFolder(categoryId: Long, newSortOrder: Int)
 
     @Query("SELECT * FROM categories WHERE id = :id")
     suspend fun getById(id: Long): Category?

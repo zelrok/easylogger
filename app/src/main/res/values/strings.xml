@@ -27,4 +27,10 @@
     <string name="select_date">Select Date</string>
     <string name="select_time">Select Time</string>
     <string name="cooldown_active">Please wait…</string>
+    <string name="add_folder">Add Folder</string>
+    <string name="edit_folder">Edit Folder</string>
+    <string name="folder_name_hint">Folder name</string>
+    <string name="folder_category_count">%1$d categories</string>
+    <string name="remove_from_folder">Remove from Folder</string>
+    <string name="empty_folder_message">This folder is empty. Drag a category here to add it.</string>
 </resources>
