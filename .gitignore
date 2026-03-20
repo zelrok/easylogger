@@ -16,3 +16,4 @@ local.properties
 *.dex
 *.class
 *.log
+.claude/
