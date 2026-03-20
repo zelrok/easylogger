@@ -1,7 +1,9 @@
 package com.easylogger.app.ui.main
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
@@ -14,10 +16,12 @@ import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ViewList
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.CreateNewFolder
 import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.automirrored.filled.ViewList
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -46,6 +50,8 @@ import com.easylogger.app.MainActivity
 import com.easylogger.app.R
 import com.easylogger.app.data.local.entity.Category
 import com.easylogger.app.data.local.entity.CategoryWithLastLog
+import com.easylogger.app.data.local.entity.Folder
+import com.easylogger.app.data.local.entity.FolderWithCount
 import com.easylogger.app.data.repository.UserPreferenceRepository
 import com.easylogger.app.ui.components.EmptyState
 import sh.calvin.reorderable.ReorderableItem
@@ -61,13 +67,21 @@ fun MainScreen(
 ) {
     val state by viewModel.state.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
-    var showAddDialog by remember { mutableStateOf(false) }
+    var showAddCategoryDialog by remember { mutableStateOf(false) }
+    var showAddFolderDialog by remember { mutableStateOf(false) }
     var editingCategory by remember { mutableStateOf<CategoryWithLastLog?>(null) }
     var deletingCategory by remember { mutableStateOf<CategoryWithLastLog?>(null) }
+    var editingFolder by remember { mutableStateOf<FolderWithCount?>(null) }
+    var deletingFolder by remember { mutableStateOf<FolderWithCount?>(null) }
     var showOverflowMenu by remember { mutableStateOf(false) }
 
     val exportEmptyMsg = stringResource(R.string.export_empty)
     val exportSuccessMsg = stringResource(R.string.export_success)
+
+    // Handle back press when inside a folder
+    if (state.currentFolderId != null) {
+        BackHandler { viewModel.exitFolder() }
+    }
 
     LaunchedEffect(Unit) {
         viewModel.events.collect { event ->
@@ -96,8 +110,28 @@ fun MainScreen(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
-                title = { Text(stringResource(R.string.app_name)) },
+                navigationIcon = {
+                    if (state.currentFolderId != null) {
+                        IconButton(onClick = { viewModel.exitFolder() }) {
+                            Icon(
+                                Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = stringResource(R.string.back)
+                            )
+                        }
+                    }
+                },
+                title = {
+                    Text(state.currentFolderName ?: stringResource(R.string.app_name))
+                },
                 actions = {
+                    if (state.currentFolderId == null) {
+                        IconButton(onClick = { showAddFolderDialog = true }) {
+                            Icon(
+                                Icons.Default.CreateNewFolder,
+                                contentDescription = stringResource(R.string.add_folder)
+                            )
+                        }
+                    }
                     IconButton(onClick = { viewModel.toggleViewMode() }) {
                         Icon(
                             imageVector = if (state.viewMode == UserPreferenceRepository.VIEW_MODE_LIST) {
@@ -136,91 +170,97 @@ fun MainScreen(
             )
         },
         floatingActionButton = {
-            FloatingActionButton(onClick = { showAddDialog = true }) {
+            FloatingActionButton(onClick = { showAddCategoryDialog = true }) {
                 Icon(Icons.Default.Add, contentDescription = stringResource(R.string.add_category))
             }
         }
     ) { padding ->
         Crossfade(
-            targetState = state.viewMode,
+            targetState = "${state.viewMode}_${state.currentFolderId}",
             modifier = Modifier.padding(padding),
             label = "viewMode"
-        ) { viewMode ->
-            if (state.categories.isEmpty() && !state.isLoading) {
-                EmptyState(message = stringResource(R.string.empty_state_message))
-            } else if (viewMode == UserPreferenceRepository.VIEW_MODE_LIST) {
-                val lazyListState = rememberLazyListState()
-                val reorderableState = rememberReorderableLazyListState(lazyListState) { from, to ->
-                    viewModel.onReorder(from.index, to.index)
-                }
+        ) { targetKey ->
+            val isInsideFolder = state.currentFolderId != null
+            val isListMode = state.viewMode == UserPreferenceRepository.VIEW_MODE_LIST
 
-                LazyColumn(
-                    state = lazyListState,
-                    modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(vertical = 8.dp)
-                ) {
-                    items(state.categories, key = { it.id }) { category ->
-                        ReorderableItem(reorderableState, key = category.id) { isDragging ->
-                            val elevation by animateDpAsState(
-                                if (isDragging) 8.dp else 0.dp,
-                                label = "dragElevation"
-                            )
-                            CategoryListItem(
-                                category = category,
-                                onClick = { onCategoryClick(category.id) },
-                                onEdit = { editingCategory = category },
-                                onDelete = { deletingCategory = category },
-                                modifier = Modifier
-                                    .shadow(elevation)
-                                    .longPressDraggableHandle(
-                                        onDragStopped = { viewModel.onReorderConfirmed() }
-                                    )
-                            )
-                        }
-                    }
+            if (!isInsideFolder && state.topLevelItems.isEmpty() && !state.isLoading) {
+                EmptyState(message = stringResource(R.string.empty_state_message))
+            } else if (isInsideFolder && state.folderCategories.isEmpty() && !state.isLoading) {
+                EmptyState(message = stringResource(R.string.empty_folder_message))
+            } else if (isInsideFolder) {
+                // Inside a folder — show categories only
+                if (isListMode) {
+                    FolderCategoryList(
+                        categories = state.folderCategories,
+                        onCategoryClick = onCategoryClick,
+                        onEdit = { editingCategory = it },
+                        onDelete = { deletingCategory = it },
+                        onRemoveFromFolder = { viewModel.removeCategoryFromFolder(it.id) },
+                        onReorder = viewModel::onReorder,
+                        onReorderConfirmed = viewModel::onReorderConfirmed
+                    )
+                } else {
+                    FolderCategoryGrid(
+                        categories = state.folderCategories,
+                        onCategoryClick = onCategoryClick,
+                        onEdit = { editingCategory = it },
+                        onDelete = { deletingCategory = it },
+                        onRemoveFromFolder = { viewModel.removeCategoryFromFolder(it.id) },
+                        onReorder = viewModel::onReorder,
+                        onReorderConfirmed = viewModel::onReorderConfirmed
+                    )
                 }
             } else {
-                val lazyGridState = rememberLazyGridState()
-                val reorderableGridState = rememberReorderableLazyGridState(lazyGridState) { from, to ->
-                    viewModel.onReorder(from.index, to.index)
-                }
-
-                LazyVerticalGrid(
-                    columns = GridCells.Adaptive(160.dp),
-                    state = lazyGridState,
-                    modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(8.dp)
-                ) {
-                    items(state.categories, key = { it.id }) { category ->
-                        ReorderableItem(reorderableGridState, key = category.id) { isDragging ->
-                            val elevation by animateDpAsState(
-                                if (isDragging) 8.dp else 1.dp,
-                                label = "dragElevation"
-                            )
-                            CategoryGridCard(
-                                category = category,
-                                onClick = { onCategoryClick(category.id) },
-                                onEdit = { editingCategory = category },
-                                onDelete = { deletingCategory = category },
-                                modifier = Modifier
-                                    .shadow(elevation, shape = MaterialTheme.shapes.medium)
-                                    .longPressDraggableHandle(
-                                        onDragStopped = { viewModel.onReorderConfirmed() }
-                                    )
-                            )
-                        }
-                    }
+                // Top level — mixed folders + categories
+                if (isListMode) {
+                    TopLevelList(
+                        items = state.topLevelItems,
+                        dragOverFolderId = state.dragOverFolderId,
+                        onCategoryClick = onCategoryClick,
+                        onEditCategory = { editingCategory = it },
+                        onDeleteCategory = { deletingCategory = it },
+                        onFolderClick = { viewModel.enterFolder(it.id, it.name) },
+                        onEditFolder = { editingFolder = it },
+                        onDeleteFolder = { deletingFolder = it },
+                        onReorder = viewModel::onReorder,
+                        onReorderConfirmed = viewModel::onReorderConfirmed
+                    )
+                } else {
+                    TopLevelGrid(
+                        items = state.topLevelItems,
+                        dragOverFolderId = state.dragOverFolderId,
+                        onCategoryClick = onCategoryClick,
+                        onEditCategory = { editingCategory = it },
+                        onDeleteCategory = { deletingCategory = it },
+                        onFolderClick = { viewModel.enterFolder(it.id, it.name) },
+                        onEditFolder = { editingFolder = it },
+                        onDeleteFolder = { deletingFolder = it },
+                        onReorder = viewModel::onReorder,
+                        onReorderConfirmed = viewModel::onReorderConfirmed
+                    )
                 }
             }
         }
     }
 
-    if (showAddDialog) {
+    // --- Dialogs ---
+
+    if (showAddCategoryDialog) {
         AddEditCategoryDialog(
-            onDismiss = { showAddDialog = false },
+            onDismiss = { showAddCategoryDialog = false },
             onSave = { name ->
                 viewModel.addCategory(name)
-                showAddDialog = false
+                showAddCategoryDialog = false
+            }
+        )
+    }
+
+    if (showAddFolderDialog) {
+        AddEditFolderDialog(
+            onDismiss = { showAddFolderDialog = false },
+            onSave = { name ->
+                viewModel.addFolder(name)
+                showAddFolderDialog = false
             }
         )
     }
@@ -235,10 +275,30 @@ fun MainScreen(
                         id = category.id,
                         name = name,
                         sortOrder = category.sortOrder,
-                        createdAt = category.createdAt
+                        createdAt = category.createdAt,
+                        folderId = category.folderId,
+                        folderSortOrder = category.folderSortOrder
                     )
                 )
                 editingCategory = null
+            }
+        )
+    }
+
+    editingFolder?.let { folder ->
+        AddEditFolderDialog(
+            initialName = folder.name,
+            onDismiss = { editingFolder = null },
+            onSave = { name ->
+                viewModel.updateFolder(
+                    Folder(
+                        id = folder.id,
+                        name = name,
+                        sortOrder = folder.sortOrder,
+                        createdAt = folder.createdAt
+                    )
+                )
+                editingFolder = null
             }
         )
     }
@@ -252,5 +312,249 @@ fun MainScreen(
                 deletingCategory = null
             }
         )
+    }
+
+    deletingFolder?.let { folder ->
+        DeleteCategoryDialog(
+            categoryName = folder.name,
+            onDismiss = { deletingFolder = null },
+            onConfirm = {
+                viewModel.deleteFolder(folder)
+                deletingFolder = null
+            }
+        )
+    }
+}
+
+// --- Top-level list composable ---
+
+@Composable
+private fun TopLevelList(
+    items: List<MainListItem>,
+    dragOverFolderId: Long?,
+    onCategoryClick: (Long) -> Unit,
+    onEditCategory: (CategoryWithLastLog) -> Unit,
+    onDeleteCategory: (CategoryWithLastLog) -> Unit,
+    onFolderClick: (FolderWithCount) -> Unit,
+    onEditFolder: (FolderWithCount) -> Unit,
+    onDeleteFolder: (FolderWithCount) -> Unit,
+    onReorder: (Int, Int) -> Unit,
+    onReorderConfirmed: () -> Unit
+) {
+    val lazyListState = rememberLazyListState()
+    val reorderableState = rememberReorderableLazyListState(lazyListState) { from, to ->
+        onReorder(from.index, to.index)
+    }
+
+    LazyColumn(
+        state = lazyListState,
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(vertical = 8.dp)
+    ) {
+        items(items, key = { it.itemKey }) { item ->
+            ReorderableItem(reorderableState, key = item.itemKey) { isDragging ->
+                val elevation by animateDpAsState(
+                    if (isDragging) 8.dp else 0.dp,
+                    label = "dragElevation"
+                )
+                when (item) {
+                    is MainListItem.CategoryItem -> {
+                        CategoryListItem(
+                            category = item.data,
+                            onClick = { onCategoryClick(item.data.id) },
+                            onEdit = { onEditCategory(item.data) },
+                            onDelete = { onDeleteCategory(item.data) },
+                            modifier = Modifier
+                                .shadow(elevation)
+                                .longPressDraggableHandle(
+                                    onDragStopped = { onReorderConfirmed() }
+                                )
+                        )
+                    }
+                    is MainListItem.FolderItem -> {
+                        val isDropTarget = dragOverFolderId == item.data.id
+                        FolderListItem(
+                            folder = item.data,
+                            isDropTarget = isDropTarget,
+                            onClick = { onFolderClick(item.data) },
+                            onEdit = { onEditFolder(item.data) },
+                            onDelete = { onDeleteFolder(item.data) },
+                            modifier = Modifier
+                                .shadow(elevation)
+                                .then(
+                                    if (isDropTarget) {
+                                        Modifier.background(
+                                            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
+                                        )
+                                    } else {
+                                        Modifier
+                                    }
+                                )
+                                .longPressDraggableHandle(
+                                    onDragStopped = { onReorderConfirmed() }
+                                )
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+// --- Top-level grid composable ---
+
+@Composable
+private fun TopLevelGrid(
+    items: List<MainListItem>,
+    dragOverFolderId: Long?,
+    onCategoryClick: (Long) -> Unit,
+    onEditCategory: (CategoryWithLastLog) -> Unit,
+    onDeleteCategory: (CategoryWithLastLog) -> Unit,
+    onFolderClick: (FolderWithCount) -> Unit,
+    onEditFolder: (FolderWithCount) -> Unit,
+    onDeleteFolder: (FolderWithCount) -> Unit,
+    onReorder: (Int, Int) -> Unit,
+    onReorderConfirmed: () -> Unit
+) {
+    val lazyGridState = rememberLazyGridState()
+    val reorderableGridState = rememberReorderableLazyGridState(lazyGridState) { from, to ->
+        onReorder(from.index, to.index)
+    }
+
+    LazyVerticalGrid(
+        columns = GridCells.Adaptive(160.dp),
+        state = lazyGridState,
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(8.dp)
+    ) {
+        items(items, key = { it.itemKey }) { item ->
+            ReorderableItem(reorderableGridState, key = item.itemKey) { isDragging ->
+                val elevation by animateDpAsState(
+                    if (isDragging) 8.dp else 1.dp,
+                    label = "dragElevation"
+                )
+                when (item) {
+                    is MainListItem.CategoryItem -> {
+                        CategoryGridCard(
+                            category = item.data,
+                            onClick = { onCategoryClick(item.data.id) },
+                            onEdit = { onEditCategory(item.data) },
+                            onDelete = { onDeleteCategory(item.data) },
+                            modifier = Modifier
+                                .shadow(elevation, shape = MaterialTheme.shapes.medium)
+                                .longPressDraggableHandle(
+                                    onDragStopped = { onReorderConfirmed() }
+                                )
+                        )
+                    }
+                    is MainListItem.FolderItem -> {
+                        val isDropTarget = dragOverFolderId == item.data.id
+                        FolderGridCard(
+                            folder = item.data,
+                            isDropTarget = isDropTarget,
+                            onClick = { onFolderClick(item.data) },
+                            onEdit = { onEditFolder(item.data) },
+                            onDelete = { onDeleteFolder(item.data) },
+                            modifier = Modifier
+                                .shadow(elevation, shape = MaterialTheme.shapes.medium)
+                                .longPressDraggableHandle(
+                                    onDragStopped = { onReorderConfirmed() }
+                                )
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+// --- Folder-interior list composable ---
+
+@Composable
+private fun FolderCategoryList(
+    categories: List<CategoryWithLastLog>,
+    onCategoryClick: (Long) -> Unit,
+    onEdit: (CategoryWithLastLog) -> Unit,
+    onDelete: (CategoryWithLastLog) -> Unit,
+    onRemoveFromFolder: (CategoryWithLastLog) -> Unit,
+    onReorder: (Int, Int) -> Unit,
+    onReorderConfirmed: () -> Unit
+) {
+    val lazyListState = rememberLazyListState()
+    val reorderableState = rememberReorderableLazyListState(lazyListState) { from, to ->
+        onReorder(from.index, to.index)
+    }
+
+    LazyColumn(
+        state = lazyListState,
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(vertical = 8.dp)
+    ) {
+        items(categories, key = { it.id }) { category ->
+            ReorderableItem(reorderableState, key = category.id) { isDragging ->
+                val elevation by animateDpAsState(
+                    if (isDragging) 8.dp else 0.dp,
+                    label = "dragElevation"
+                )
+                CategoryListItem(
+                    category = category,
+                    onClick = { onCategoryClick(category.id) },
+                    onEdit = { onEdit(category) },
+                    onDelete = { onDelete(category) },
+                    onRemoveFromFolder = { onRemoveFromFolder(category) },
+                    modifier = Modifier
+                        .shadow(elevation)
+                        .longPressDraggableHandle(
+                            onDragStopped = { onReorderConfirmed() }
+                        )
+                )
+            }
+        }
+    }
+}
+
+// --- Folder-interior grid composable ---
+
+@Composable
+private fun FolderCategoryGrid(
+    categories: List<CategoryWithLastLog>,
+    onCategoryClick: (Long) -> Unit,
+    onEdit: (CategoryWithLastLog) -> Unit,
+    onDelete: (CategoryWithLastLog) -> Unit,
+    onRemoveFromFolder: (CategoryWithLastLog) -> Unit,
+    onReorder: (Int, Int) -> Unit,
+    onReorderConfirmed: () -> Unit
+) {
+    val lazyGridState = rememberLazyGridState()
+    val reorderableGridState = rememberReorderableLazyGridState(lazyGridState) { from, to ->
+        onReorder(from.index, to.index)
+    }
+
+    LazyVerticalGrid(
+        columns = GridCells.Adaptive(160.dp),
+        state = lazyGridState,
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(8.dp)
+    ) {
+        items(categories, key = { it.id }) { category ->
+            ReorderableItem(reorderableGridState, key = category.id) { isDragging ->
+                val elevation by animateDpAsState(
+                    if (isDragging) 8.dp else 1.dp,
+                    label = "dragElevation"
+                )
+                CategoryGridCard(
+                    category = category,
+                    onClick = { onCategoryClick(category.id) },
+                    onEdit = { onEdit(category) },
+                    onDelete = { onDelete(category) },
+                    onRemoveFromFolder = { onRemoveFromFolder(category) },
+                    modifier = Modifier
+                        .shadow(elevation, shape = MaterialTheme.shapes.medium)
+                        .longPressDraggableHandle(
+                            onDragStopped = { onReorderConfirmed() }
+                        )
+                )
+            }
+        }
     }
 }
