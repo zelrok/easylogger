@@ -91,6 +91,9 @@ dependencies {
     implementation(libs.paging.runtime)
     implementation(libs.paging.compose)
 
+    // Reorderable
+    implementation(libs.reorderable)
+
     // Coroutines
     implementation(libs.coroutines.core)
     implementation(libs.coroutines.android)

@@ -18,14 +18,18 @@ class CategoryRepository @Inject constructor(
     suspend fun getById(id: Long): Category? = categoryDao.getById(id)
 
     suspend fun insert(name: String): Long {
+        val nextOrder = categoryDao.getNextSortOrder()
         val category = Category(
             name = name,
+            sortOrder = nextOrder,
             createdAt = System.currentTimeMillis()
         )
         return categoryDao.insert(category)
     }
 
     suspend fun update(category: Category) = categoryDao.update(category)
+
+    suspend fun updateSortOrders(categories: List<Category>) = categoryDao.updateAll(categories)
 
     suspend fun delete(category: Category) = categoryDao.delete(category)
 }
