@@ -1,0 +1,77 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## Build & Test Commands
+
+```bash
+./gradlew assembleDebug          # Build debug APK
+./gradlew test                   # Run unit tests (JVM)
+./gradlew connectedAndroidTest   # Run instrumented tests (requires device/emulator)
+
+# Run a single test class
+./gradlew test --tests "com.easylogger.app.ui.main.CategoryListViewModelTest"
+
+# Run a single test method
+./gradlew test --tests "com.easylogger.app.ui.main.CategoryListViewModelTest.testMethodName"
+```
+
+## Architecture
+
+Single-module Android app (`com.easylogger.app`) using single-Activity + Jetpack Compose navigation.
+
+**Layers:**
+
+- **data/local/entity/** — Room entities: Category, LogEntry, Folder, UserPreference. Category→Folder FK (SET_NULL), LogEntry→Category FK (CASCADE).
+- **data/local/dao/** — Room DAOs. LogEntryDao exposes `PagingSource` for paged history. CategoryDao uses complex queries (MAX timestamp joins, count aggregations).
+- **data/repository/** — @Singleton repositories wrapping DAOs. Business logic lives here (sort order calculation, timestamp formatting).
+- **di/DatabaseModule.kt** — Hilt module providing AppDatabase and all DAOs at SingletonComponent scope.
+- **ui/main/** — Home screen: category/folder list+grid with drag-to-reorder, folder navigation via BackHandler.
+- **ui/detail/** — Log history screen: paged entries (Paging 3, 50/page), Log Now (500ms cooldown), manual date/time entry.
+- **ui/navigation/** — NavRoutes sealed class with Main and Detail(categoryId) routes.
+- **export/CsvExporter.kt** — CSV export via SAF with UTF-8 BOM and ISO 8601 timestamps.
+
+**State management:** ViewModels expose `StateFlow` for UI state and `Channel` for one-shot events. Composables collect via `collectAsStateWithLifecycle()`.
+
+**DI chain:** Hilt `@HiltAndroidApp` → `@AndroidEntryPoint` Activity → `@HiltViewModel` ViewModels (constructor-injected repositories) → `@Singleton` repositories (constructor-injected DAOs).
+
+## Database
+
+Room database (AppDatabase) at version 2 with exported schemas to `app/schemas/`. Migration 1→2 adds folders table and folderId/folderSortOrder to categories. KSP generates Room code.
+
+## Testing
+
+- **Unit tests** (`app/src/test/`): JVM tests using fake DAO implementations, kotlinx-coroutines-test, and Turbine for Flow assertions. Cover repositories and ViewModels.
+- **Instrumented tests** (`app/src/androidTest/`): Run on device/emulator. Test real Room database behavior for DAOs.
+
+## Key Dependencies
+
+Versions managed in `gradle/libs.versions.toml`. Kotlin 2.1.0, Compose BOM 2024.12.01, Room 2.6.1, Hilt 2.53.1, Paging 3.3.5. Drag-to-reorder uses `sh.calvin.reorderable:2.4.2`.
+
+## Project Status
+
+All features from the spec are implemented. The app is production-ready at v1.1 (versionCode 2).
+
+**Known UI polish gaps** (minor, not blocking):
+
+1. Haptic feedback on "Log Now" — spec calls for it, not implemented
+2. Shared element transitions between list and detail screen
+3. Highlight animation on newly added log entries
+4. Fade-out animation on deleted items
+5. Grid responsiveness on tablets (spec says 3-4 columns)
+6. Grid long-press context menu as alternative to overflow icon
+7. "Add" card styling — spec says dashed border in list mode, "+" card in grid
+
+**Non-goals** (explicitly out of scope per spec): cloud sync, charts/analytics, reminders/notifications, user accounts, CSV import, color-coding, home screen widget.
+
+## Changelog
+
+### v1.1 (2026-03-20) — versionCode 2
+
+- **Category folders:** Create/edit/delete folders, drag categories into folders, folder-interior reorder, "Remove from Folder" context menu, folder-aware "+" button. New Folder entity, FolderDao, FolderRepository. Room migration v1→v2 (folders table, folderId/folderSortOrder on categories).
+- **Drag-to-reorder categories:** Long-press to drag in both list/grid modes. Uses `sh.calvin.reorderable` v2.4.2. Optimistic UI with Room persistence on drop.
+- **Bug fix:** DateTimePickerDialog UTC/local timezone mismatch when editing existing log entries. Material 3 DatePicker operates in UTC but code was passing local-timezone millis.
+
+## Project Documentation
+
+- `docs/Easy_Logger_App_Spec.md` — Full product specification
