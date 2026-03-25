@@ -13,14 +13,17 @@ import kotlinx.coroutines.flow.Flow
 @Dao
 interface LogEntryDao {
 
-    @Query("SELECT * FROM log_entries WHERE categoryId = :categoryId ORDER BY timestamp DESC")
+    @Query("SELECT * FROM log_entries WHERE categoryId = :categoryId ORDER BY startTime DESC")
     fun getByCategoryId(categoryId: Long): PagingSource<Int, LogEntry>
 
-    @Query("SELECT * FROM log_entries ORDER BY categoryId ASC, timestamp ASC")
+    @Query("SELECT * FROM log_entries ORDER BY categoryId ASC, startTime ASC")
     suspend fun getAll(): List<LogEntry>
 
-    @Query("SELECT MAX(timestamp) FROM log_entries WHERE categoryId = :categoryId")
-    fun getLastTimestamp(categoryId: Long): Flow<Long?>
+    @Query("SELECT MAX(startTime) FROM log_entries WHERE categoryId = :categoryId")
+    fun getLastStartTime(categoryId: Long): Flow<Long?>
+
+    @Query("SELECT * FROM log_entries WHERE categoryId = :categoryId AND endTime IS NULL LIMIT 1")
+    fun getOpenEntry(categoryId: Long): Flow<LogEntry?>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(logEntry: LogEntry): Long
