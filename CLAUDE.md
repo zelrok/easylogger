@@ -48,9 +48,19 @@ Room database (AppDatabase) at version 2 with exported schemas to `app/schemas/`
 
 Versions managed in `gradle/libs.versions.toml`. Kotlin 2.1.0, Compose BOM 2024.12.01, Room 2.6.1, Hilt 2.53.1, Paging 3.3.5. Drag-to-reorder uses `sh.calvin.reorderable:2.4.2`.
 
+## Versioning
+
+This project follows [Semantic Versioning 2.0.0](https://semver.org/). The `versionName` in `app/build.gradle.kts` must always be MAJOR.MINOR.PATCH:
+
+- **MAJOR** — breaking changes (e.g. incompatible database migration, removed features)
+- **MINOR** — new features (backward compatible)
+- **PATCH** — bug fixes, UI polish
+
+Android's `versionCode` is an independent integer that increments by 1 with every release, regardless of which SemVer component changes.
+
 ## Project Status
 
-All features from the spec are implemented. The app is production-ready at v1.1 (versionCode 2).
+All features from the spec are implemented. The app is production-ready at v1.1.0 (versionCode 2).
 
 **Known UI polish gaps** (minor, not blocking):
 
@@ -66,7 +76,7 @@ All features from the spec are implemented. The app is production-ready at v1.1 
 
 ## Changelog
 
-### v1.1 (2026-03-20) — versionCode 2
+### v1.1.0 (2026-03-20) — versionCode 2
 
 - **Category folders:** Create/edit/delete folders, drag categories into folders, folder-interior reorder, "Remove from Folder" context menu, folder-aware "+" button. New Folder entity, FolderDao, FolderRepository. Room migration v1→v2 (folders table, folderId/folderSortOrder on categories).
 - **Drag-to-reorder categories:** Long-press to drag in both list/grid modes. Uses `sh.calvin.reorderable` v2.4.2. Optimistic UI with Room persistence on drop.
