@@ -1,5 +1,6 @@
 package com.easylogger.app.ui.detail
 
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -33,11 +34,33 @@ fun LogEntryItem(
             .padding(horizontal = 16.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(
-            text = formatTimestamp(entry.timestamp),
-            style = MaterialTheme.typography.bodyMedium,
-            modifier = Modifier.weight(1f)
-        )
+        Column(modifier = Modifier.weight(1f)) {
+            when {
+                entry.endTime == null -> {
+                    Text(
+                        text = "${formatTimestamp(entry.startTime)} — ${stringResource(R.string.in_progress)}",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                }
+                entry.endTime == entry.startTime -> {
+                    Text(
+                        text = formatTimestamp(entry.startTime),
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                }
+                else -> {
+                    Text(
+                        text = "${formatTimestamp(entry.startTime)} — ${formatTimestamp(entry.endTime)}",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                    Text(
+                        text = formatDuration(entry.endTime - entry.startTime),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        }
         IconButton(onClick = onEdit) {
             Icon(
                 Icons.Outlined.Edit,
@@ -51,5 +74,17 @@ fun LogEntryItem(
                 contentDescription = stringResource(R.string.delete)
             )
         }
+    }
+}
+
+internal fun formatDuration(millis: Long): String {
+    val totalSeconds = millis / 1000
+    val hours = totalSeconds / 3600
+    val minutes = (totalSeconds % 3600) / 60
+    val seconds = totalSeconds % 60
+    return when {
+        hours > 0 -> "${hours}h ${minutes}m"
+        minutes > 0 -> "${minutes}m"
+        else -> "${seconds}s"
     }
 }
