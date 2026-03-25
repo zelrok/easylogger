@@ -60,7 +60,7 @@ Android's `versionCode` is an independent integer that increments by 1 with ever
 
 ## Project Status
 
-All features from the spec are implemented. The app is production-ready at v1.1.0 (versionCode 2).
+All features from the spec are implemented. The app is production-ready at v1.2.0 (versionCode 3).
 
 **Known UI polish gaps** (minor, not blocking):
 
@@ -75,6 +75,10 @@ All features from the spec are implemented. The app is production-ready at v1.1.
 **Non-goals** (explicitly out of scope per spec): cloud sync, charts/analytics, reminders/notifications, user accounts, CSV import, color-coding, home screen widget.
 
 ## Changelog
+
+### v1.2.0 (2026-03-25) — versionCode 3
+
+- **Version in title bar:** Top app bar now shows "Easy Logger v{version}" using the version from PackageInfo. Folder views still show only the folder name. (Closes #1)
 
 ### v1.1.0 (2026-03-20) — versionCode 2
 
