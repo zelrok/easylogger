@@ -1,6 +1,7 @@
 package com.easylogger.app.ui.main
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.background
@@ -121,7 +122,14 @@ fun MainScreen(
                     }
                 },
                 title = {
-                    Text(state.currentFolderName ?: stringResource(R.string.app_name))
+                    if (state.currentFolderId != null) {
+                        Text(state.currentFolderName ?: "")
+                    } else {
+                        val context = LocalContext.current
+                        val versionName = context.packageManager
+                            .getPackageInfo(context.packageName, 0).versionName
+                        Text("${stringResource(R.string.app_name)} v$versionName")
+                    }
                 },
                 actions = {
                     if (state.currentFolderId == null) {
