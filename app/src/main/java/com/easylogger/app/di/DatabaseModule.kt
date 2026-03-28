@@ -5,6 +5,7 @@ import androidx.room.Room
 import com.easylogger.app.data.local.AppDatabase
 import com.easylogger.app.data.local.MIGRATION_1_2
 import com.easylogger.app.data.local.MIGRATION_2_3
+import com.easylogger.app.data.local.MIGRATION_3_4
 import com.easylogger.app.data.local.dao.CategoryDao
 import com.easylogger.app.data.local.dao.FolderDao
 import com.easylogger.app.data.local.dao.LogEntryDao
@@ -27,7 +28,7 @@ object DatabaseModule {
             context,
             AppDatabase::class.java,
             "easylogger.db"
-        ).addMigrations(MIGRATION_1_2, MIGRATION_2_3).build()
+        ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4).build()
     }
 
     @Provides

@@ -5,5 +5,7 @@ data class FolderWithCount(
     val name: String,
     val sortOrder: Int,
     val createdAt: Long,
-    val categoryCount: Int
+    val parentFolderId: Long?,
+    val folderSortOrder: Int,
+    val childCount: Int
 )

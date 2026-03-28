@@ -53,13 +53,21 @@ interface CategoryDao {
         SELECT COALESCE(MAX(sortOrder), -1) + 1 FROM (
             SELECT sortOrder FROM categories WHERE folderId IS NULL
             UNION ALL
-            SELECT sortOrder FROM folders
+            SELECT sortOrder FROM folders WHERE parentFolderId IS NULL
         )
         """
     )
     suspend fun getNextSortOrder(): Int
 
-    @Query("SELECT COALESCE(MAX(folderSortOrder), -1) + 1 FROM categories WHERE folderId = :folderId")
+    @Query(
+        """
+        SELECT COALESCE(MAX(ord), -1) + 1 FROM (
+            SELECT folderSortOrder AS ord FROM categories WHERE folderId = :folderId
+            UNION ALL
+            SELECT folderSortOrder AS ord FROM folders WHERE parentFolderId = :folderId
+        )
+        """
+    )
     suspend fun getNextFolderSortOrder(folderId: Long): Int
 
     @Query("UPDATE categories SET folderId = :folderId, folderSortOrder = :folderSortOrder WHERE id = :categoryId")
