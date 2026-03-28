@@ -61,7 +61,7 @@ Android's `versionCode` is an independent integer that increments by 1 with ever
 
 ## Project Status
 
-All features from the spec are implemented. The app is production-ready at v1.2.0 (versionCode 3).
+All features from the spec are implemented. The app is production-ready at v1.3.0 (versionCode 4).
 
 **Known UI polish gaps** (minor, not blocking):
 
@@ -77,11 +77,9 @@ All features from the spec are implemented. The app is production-ready at v1.2.
 
 ## Changelog
 
-### WIP — feature/time-windows (branch, not yet merged)
+### v1.3.0 (2026-03-28) — versionCode 4
 
 - **Time windows:** Log entries now support start/end times. LogEntry entity: `timestamp` → `startTime` + nullable `endTime`. Three logging modes: "Log Now" (instant, startTime==endTime), "Log Start"/"Log Stop" (open/close a time window), "Log Manual" (pick start+end via 4-step date/time picker). Open entries show "in progress"; closed windows show duration. DateTimePickerDialog redesigned as 4-step flow (start date → start time → end date → end time) with "Same as start" shortcut. CSV export updated with start_time/end_time columns. Room migration v2→v3 (table rebuild). All unit and instrumented tests updated.
-- **Release signing & APK naming:** Added release signing config via `keystore.properties` (gitignored) so QA can sideload APKs. APK output files are named dynamically: `easylogger-{version}-{branch}-{buildType}.apk`.
-- **Remaining work:** QA testing on device, version bump, schema export, merge to main.
 
 ### v1.2.0 (2026-03-25) — versionCode 3
 
