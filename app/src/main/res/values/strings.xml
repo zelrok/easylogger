@@ -14,7 +14,15 @@
     <string name="empty_state_message">Tap + to start tracking something.</string>
     <string name="empty_detail_message">No entries yet. Tap a button below to log your first.</string>
     <string name="log_now">Log Now</string>
+    <string name="log_start">Log Start</string>
+    <string name="log_stop">Log Stop</string>
     <string name="log_manual">Log Manual</string>
+    <string name="in_progress">in progress</string>
+    <string name="select_start_date">Select start date</string>
+    <string name="select_start_time">Select start time</string>
+    <string name="select_end_date">Select end date</string>
+    <string name="select_end_time">Select end time</string>
+    <string name="same_as_start">Same as start</string>
     <string name="logged_at">Logged at %1$s</string>
     <string name="export_csv">Export to CSV</string>
     <string name="export_success">Exported %1$d entries to %2$s</string>

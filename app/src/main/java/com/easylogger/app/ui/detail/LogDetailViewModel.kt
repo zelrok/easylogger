@@ -18,6 +18,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -52,7 +53,10 @@ class LogDetailViewModel @Inject constructor(
         pagingSourceFactory = { logEntryRepository.getByCategoryId(categoryId) }
     ).flow.cachedIn(viewModelScope)
 
-    val lastTimestamp: StateFlow<Long?> = logEntryRepository.getLastTimestamp(categoryId)
+    val lastStartTime: StateFlow<Long?> = logEntryRepository.getLastStartTime(categoryId)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
+
+    val openEntry: StateFlow<LogEntry?> = logEntryRepository.getOpenEntry(categoryId)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
     init {
@@ -69,7 +73,10 @@ class LogDetailViewModel @Inject constructor(
         _cooldownActive.value = true
 
         viewModelScope.launch {
-            logEntryRepository.insert(categoryId, now)
+            logEntryRepository.getOpenEntry(categoryId).first()?.let { open ->
+                logEntryRepository.stopEntry(open, now)
+            }
+            logEntryRepository.insertInstant(categoryId, now)
             val formatted = java.text.SimpleDateFormat(
                 "h:mm a",
                 java.util.Locale.getDefault()
@@ -81,15 +88,43 @@ class LogDetailViewModel @Inject constructor(
         }
     }
 
-    fun logManual(timestamp: Long) {
+    fun logStart() {
+        val now = System.currentTimeMillis()
+        if (now - lastLogTimeMillis < 500) return
+        lastLogTimeMillis = now
+
         viewModelScope.launch {
-            logEntryRepository.insert(categoryId, timestamp)
+            logEntryRepository.insertStart(categoryId, now)
+            val formatted = java.text.SimpleDateFormat(
+                "h:mm a",
+                java.util.Locale.getDefault()
+            ).format(java.util.Date(now))
+            _events.send(DetailEvent.LoggedAt(formatted))
         }
     }
 
-    fun updateEntry(entry: LogEntry, newTimestamp: Long) {
+    fun logStop() {
         viewModelScope.launch {
-            logEntryRepository.update(entry.copy(timestamp = newTimestamp))
+            val open = logEntryRepository.getOpenEntry(categoryId).first() ?: return@launch
+            val now = System.currentTimeMillis()
+            logEntryRepository.stopEntry(open, now)
+            val formatted = java.text.SimpleDateFormat(
+                "h:mm a",
+                java.util.Locale.getDefault()
+            ).format(java.util.Date(now))
+            _events.send(DetailEvent.LoggedAt(formatted))
+        }
+    }
+
+    fun logManual(startTime: Long, endTime: Long) {
+        viewModelScope.launch {
+            logEntryRepository.insertManual(categoryId, startTime, endTime)
+        }
+    }
+
+    fun updateEntry(entry: LogEntry, newStartTime: Long, newEndTime: Long?) {
+        viewModelScope.launch {
+            logEntryRepository.update(entry.copy(startTime = newStartTime, endTime = newEndTime))
         }
     }
 

@@ -24,19 +24,20 @@ class CsvExporter @Inject constructor(
 
         val sorted = entries.sortedWith(
             compareBy<com.easylogger.app.data.local.entity.LogEntry> { categoryMap[it.categoryId] ?: "" }
-                .thenBy { it.timestamp }
+                .thenBy { it.startTime }
         )
 
         OutputStreamWriter(outputStream, Charsets.UTF_8).use { writer ->
             // UTF-8 BOM for Excel compatibility
             outputStream.write(byteArrayOf(0xEF.toByte(), 0xBB.toByte(), 0xBF.toByte()))
 
-            writer.write("category,timestamp,created_at\n")
+            writer.write("category,start_time,end_time,created_at\n")
             for (entry in sorted) {
                 val categoryName = categoryMap[entry.categoryId] ?: "Unknown"
-                val timestamp = isoFormat.format(Date(entry.timestamp))
+                val startTime = isoFormat.format(Date(entry.startTime))
+                val endTime = entry.endTime?.let { isoFormat.format(Date(it)) } ?: ""
                 val createdAt = isoFormat.format(Date(entry.createdAt))
-                writer.write("${escapeCsv(categoryName)},${timestamp},${createdAt}\n")
+                writer.write("${escapeCsv(categoryName)},${startTime},${endTime},${createdAt}\n")
             }
         }
 

@@ -44,12 +44,14 @@ fun DetailScreen(
 ) {
     val category by viewModel.category.collectAsState()
     val cooldownActive by viewModel.cooldownActive.collectAsState()
+    val openEntry by viewModel.openEntry.collectAsState()
     val pagingItems = viewModel.entries.collectAsLazyPagingItems()
     val snackbarHostState = remember { SnackbarHostState() }
-    var showDateTimePicker by remember { mutableStateOf(false) }
+    var showManualPicker by remember { mutableStateOf(false) }
     var editingEntry by remember { mutableStateOf<LogEntry?>(null) }
     var deletingEntry by remember { mutableStateOf<LogEntry?>(null) }
 
+    val hasOpenWindow = openEntry != null
     val loggedAtFormat = stringResource(R.string.logged_at)
 
     LaunchedEffect(Unit) {
@@ -126,7 +128,18 @@ fun DetailScreen(
                     )
                 }
                 Button(
-                    onClick = { showDateTimePicker = true },
+                    onClick = {
+                        if (hasOpenWindow) viewModel.logStop() else viewModel.logStart()
+                    },
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text(
+                        if (hasOpenWindow) stringResource(R.string.log_stop)
+                        else stringResource(R.string.log_start)
+                    )
+                }
+                Button(
+                    onClick = { showManualPicker = true },
                     modifier = Modifier.weight(1f)
                 ) {
                     Text(stringResource(R.string.log_manual))
@@ -135,22 +148,23 @@ fun DetailScreen(
         }
     }
 
-    if (showDateTimePicker) {
+    if (showManualPicker) {
         DateTimePickerDialog(
-            onDismiss = { showDateTimePicker = false },
-            onConfirm = { timestamp ->
-                viewModel.logManual(timestamp)
-                showDateTimePicker = false
+            onDismiss = { showManualPicker = false },
+            onConfirm = { startTime, endTime ->
+                viewModel.logManual(startTime, endTime)
+                showManualPicker = false
             }
         )
     }
 
     editingEntry?.let { entry ->
         DateTimePickerDialog(
-            initialTimestamp = entry.timestamp,
+            initialStartTime = entry.startTime,
+            initialEndTime = entry.endTime,
             onDismiss = { editingEntry = null },
-            onConfirm = { timestamp ->
-                viewModel.updateEntry(entry, timestamp)
+            onConfirm = { startTime, endTime ->
+                viewModel.updateEntry(entry, startTime, endTime)
                 editingEntry = null
             }
         )

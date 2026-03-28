@@ -19,7 +19,7 @@ interface CategoryDao {
     @Query(
         """
         SELECT c.id, c.name, c.sortOrder, c.createdAt, c.folderId, c.folderSortOrder,
-               (SELECT MAX(le.timestamp) FROM log_entries le WHERE le.categoryId = c.id) AS lastLogTimestamp
+               (SELECT MAX(le.startTime) FROM log_entries le WHERE le.categoryId = c.id) AS lastLogTimestamp
         FROM categories c
         ORDER BY c.sortOrder ASC, c.createdAt ASC
         """
@@ -29,7 +29,7 @@ interface CategoryDao {
     @Query(
         """
         SELECT c.id, c.name, c.sortOrder, c.createdAt, c.folderId, c.folderSortOrder,
-               (SELECT MAX(le.timestamp) FROM log_entries le WHERE le.categoryId = c.id) AS lastLogTimestamp
+               (SELECT MAX(le.startTime) FROM log_entries le WHERE le.categoryId = c.id) AS lastLogTimestamp
         FROM categories c
         WHERE c.folderId IS NULL
         ORDER BY c.sortOrder ASC, c.createdAt ASC
@@ -40,7 +40,7 @@ interface CategoryDao {
     @Query(
         """
         SELECT c.id, c.name, c.sortOrder, c.createdAt, c.folderId, c.folderSortOrder,
-               (SELECT MAX(le.timestamp) FROM log_entries le WHERE le.categoryId = c.id) AS lastLogTimestamp
+               (SELECT MAX(le.startTime) FROM log_entries le WHERE le.categoryId = c.id) AS lastLogTimestamp
         FROM categories c
         WHERE c.folderId = :folderId
         ORDER BY c.folderSortOrder ASC, c.createdAt ASC

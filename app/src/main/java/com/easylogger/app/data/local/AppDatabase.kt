@@ -13,7 +13,7 @@ import com.easylogger.app.data.local.entity.UserPreference
 
 @Database(
     entities = [Category::class, LogEntry::class, UserPreference::class, Folder::class],
-    version = 2,
+    version = 3,
     exportSchema = true
 )
 abstract class AppDatabase : RoomDatabase() {

@@ -6,6 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ```bash
 ./gradlew assembleDebug          # Build debug APK
+./gradlew assembleRelease        # Build signed release APK (requires keystore.properties)
 ./gradlew test                   # Run unit tests (JVM)
 ./gradlew connectedAndroidTest   # Run instrumented tests (requires device/emulator)
 
@@ -27,9 +28,9 @@ Single-module Android app (`com.easylogger.app`) using single-Activity + Jetpack
 - **data/repository/** — @Singleton repositories wrapping DAOs. Business logic lives here (sort order calculation, timestamp formatting).
 - **di/DatabaseModule.kt** — Hilt module providing AppDatabase and all DAOs at SingletonComponent scope.
 - **ui/main/** — Home screen: category/folder list+grid with drag-to-reorder, folder navigation via BackHandler.
-- **ui/detail/** — Log history screen: paged entries (Paging 3, 50/page), Log Now (500ms cooldown), manual date/time entry.
+- **ui/detail/** — Log history screen: paged entries (Paging 3, 50/page), Log Now (500ms cooldown), Log Start/Stop (time windows), manual date/time entry with start+end.
 - **ui/navigation/** — NavRoutes sealed class with Main and Detail(categoryId) routes.
-- **export/CsvExporter.kt** — CSV export via SAF with UTF-8 BOM and ISO 8601 timestamps.
+- **export/CsvExporter.kt** — CSV export via SAF with UTF-8 BOM and ISO 8601 timestamps. Columns: category, start_time, end_time, created_at.
 
 **State management:** ViewModels expose `StateFlow` for UI state and `Channel` for one-shot events. Composables collect via `collectAsStateWithLifecycle()`.
 
@@ -37,7 +38,7 @@ Single-module Android app (`com.easylogger.app`) using single-Activity + Jetpack
 
 ## Database
 
-Room database (AppDatabase) at version 2 with exported schemas to `app/schemas/`. Migration 1→2 adds folders table and folderId/folderSortOrder to categories. KSP generates Room code.
+Room database (AppDatabase) at version 3 with exported schemas to `app/schemas/`. Migration 1→2 adds folders table and folderId/folderSortOrder to categories. Migration 2→3 renames `timestamp` to `startTime` and adds nullable `endTime` to log_entries (table rebuild). KSP generates Room code.
 
 ## Testing
 
@@ -60,7 +61,7 @@ Android's `versionCode` is an independent integer that increments by 1 with ever
 
 ## Project Status
 
-All features from the spec are implemented. The app is production-ready at v1.2.0 (versionCode 3).
+All features from the spec are implemented. The app is production-ready at v1.3.0 (versionCode 4).
 
 **Known UI polish gaps** (minor, not blocking):
 
@@ -75,6 +76,10 @@ All features from the spec are implemented. The app is production-ready at v1.2.
 **Non-goals** (explicitly out of scope per spec): cloud sync, charts/analytics, reminders/notifications, user accounts, CSV import, color-coding, home screen widget.
 
 ## Changelog
+
+### v1.3.0 (2026-03-28) — versionCode 4
+
+- **Time windows:** Log entries now support start/end times. LogEntry entity: `timestamp` → `startTime` + nullable `endTime`. Three logging modes: "Log Now" (instant, startTime==endTime), "Log Start"/"Log Stop" (open/close a time window), "Log Manual" (pick start+end via 4-step date/time picker). Open entries show "in progress"; closed windows show duration. DateTimePickerDialog redesigned as 4-step flow (start date → start time → end date → end time) with "Same as start" shortcut. CSV export updated with start_time/end_time columns. Room migration v2→v3 (table rebuild). All unit and instrumented tests updated.
 
 ### v1.2.0 (2026-03-25) — versionCode 3
 

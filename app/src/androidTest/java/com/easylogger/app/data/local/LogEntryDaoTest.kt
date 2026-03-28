@@ -8,9 +8,11 @@ import com.easylogger.app.data.local.dao.CategoryDao
 import com.easylogger.app.data.local.dao.LogEntryDao
 import com.easylogger.app.data.local.entity.Category
 import com.easylogger.app.data.local.entity.LogEntry
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -42,7 +44,7 @@ class LogEntryDaoTest {
     fun insertAndRetrieveEntry() = runTest {
         val categoryId = categoryDao.insert(Category(name = "Cat", sortOrder = 0, createdAt = 100L))
         val entryId = logEntryDao.insert(
-            LogEntry(categoryId = categoryId, timestamp = 200L, createdAt = 200L)
+            LogEntry(categoryId = categoryId, startTime = 200L, endTime = 200L, createdAt = 200L)
         )
         val entries = logEntryDao.getAll()
         assertEquals(1, entries.size)
@@ -52,39 +54,59 @@ class LogEntryDaoTest {
     @Test
     fun updateEntry() = runTest {
         val categoryId = categoryDao.insert(Category(name = "Cat", sortOrder = 0, createdAt = 100L))
-        val entryId = logEntryDao.insert(
-            LogEntry(categoryId = categoryId, timestamp = 200L, createdAt = 200L)
+        logEntryDao.insert(
+            LogEntry(categoryId = categoryId, startTime = 200L, endTime = 200L, createdAt = 200L)
         )
         val entry = logEntryDao.getAll().first()
-        logEntryDao.update(entry.copy(timestamp = 999L))
+        logEntryDao.update(entry.copy(startTime = 999L, endTime = 999L))
         val updated = logEntryDao.getAll().first()
-        assertEquals(999L, updated.timestamp)
+        assertEquals(999L, updated.startTime)
+        assertEquals(999L, updated.endTime)
     }
 
     @Test
     fun deleteEntry() = runTest {
         val categoryId = categoryDao.insert(Category(name = "Cat", sortOrder = 0, createdAt = 100L))
-        logEntryDao.insert(LogEntry(categoryId = categoryId, timestamp = 200L, createdAt = 200L))
+        logEntryDao.insert(LogEntry(categoryId = categoryId, startTime = 200L, endTime = 200L, createdAt = 200L))
         val entry = logEntryDao.getAll().first()
         logEntryDao.delete(entry)
         assertTrue(logEntryDao.getAll().isEmpty())
     }
 
     @Test
-    fun getAllReturnsSortedByCategoryAndTimestamp() = runTest {
+    fun getAllReturnsSortedByCategoryAndStartTime() = runTest {
         val cat1 = categoryDao.insert(Category(name = "A", sortOrder = 0, createdAt = 100L))
         val cat2 = categoryDao.insert(Category(name = "B", sortOrder = 1, createdAt = 100L))
-        logEntryDao.insert(LogEntry(categoryId = cat2, timestamp = 300L, createdAt = 300L))
-        logEntryDao.insert(LogEntry(categoryId = cat1, timestamp = 100L, createdAt = 100L))
-        logEntryDao.insert(LogEntry(categoryId = cat1, timestamp = 200L, createdAt = 200L))
+        logEntryDao.insert(LogEntry(categoryId = cat2, startTime = 300L, endTime = 300L, createdAt = 300L))
+        logEntryDao.insert(LogEntry(categoryId = cat1, startTime = 100L, endTime = 100L, createdAt = 100L))
+        logEntryDao.insert(LogEntry(categoryId = cat1, startTime = 200L, endTime = 200L, createdAt = 200L))
 
         val entries = logEntryDao.getAll()
         assertEquals(3, entries.size)
-        // Sorted by categoryId ASC, timestamp ASC
         assertEquals(cat1, entries[0].categoryId)
-        assertEquals(100L, entries[0].timestamp)
+        assertEquals(100L, entries[0].startTime)
         assertEquals(cat1, entries[1].categoryId)
-        assertEquals(200L, entries[1].timestamp)
+        assertEquals(200L, entries[1].startTime)
         assertEquals(cat2, entries[2].categoryId)
+    }
+
+    @Test
+    fun getOpenEntryReturnsNullEndTimeEntry() = runTest {
+        val categoryId = categoryDao.insert(Category(name = "Cat", sortOrder = 0, createdAt = 100L))
+        logEntryDao.insert(LogEntry(categoryId = categoryId, startTime = 100L, endTime = 100L, createdAt = 100L))
+        logEntryDao.insert(LogEntry(categoryId = categoryId, startTime = 200L, endTime = null, createdAt = 200L))
+
+        val open = logEntryDao.getOpenEntry(categoryId).first()
+        assertEquals(200L, open?.startTime)
+        assertNull(open?.endTime)
+    }
+
+    @Test
+    fun getOpenEntryReturnsNullWhenAllClosed() = runTest {
+        val categoryId = categoryDao.insert(Category(name = "Cat", sortOrder = 0, createdAt = 100L))
+        logEntryDao.insert(LogEntry(categoryId = categoryId, startTime = 100L, endTime = 100L, createdAt = 100L))
+
+        val open = logEntryDao.getOpenEntry(categoryId).first()
+        assertNull(open)
     }
 }
