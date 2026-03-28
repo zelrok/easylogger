@@ -1,3 +1,7 @@
+# Foreword by Charles Lane
+
+This project has been an idea I've had for a long time, but has never quite made it off the back burner. This made it a perfect candidate to explore Claude Code as a way to develop apps faster with a somewhat low stakes project. Everything outside of this foreword has been made with Claude Code with myself acting as Project Manager.
+
 # Easy Logger
 
 A lightweight Android app for tracking recurring personal activities. Create custom categories, log timestamps with a single tap, and export your data to CSV — all fully offline with no account required.
