@@ -17,3 +17,5 @@ local.properties
 *.class
 *.log
 .claude/
+keystore.properties
+*.jks
