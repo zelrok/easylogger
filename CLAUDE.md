@@ -23,7 +23,7 @@ Single-module Android app (`com.easylogger.app`) using single-Activity + Jetpack
 
 **Layers:**
 
-- **data/local/entity/** — Room entities: Category, LogEntry, Folder, UserPreference. Category→Folder FK (SET_NULL), LogEntry→Category FK (CASCADE).
+- **data/local/entity/** — Room entities: Category, LogEntry, Folder, UserPreference. Category→Folder FK (SET_NULL), LogEntry→Category FK (CASCADE). Folder has self-referential FK (parentFolderId, SET_NULL) for nested folders.
 - **data/local/dao/** — Room DAOs. LogEntryDao exposes `PagingSource` for paged history. CategoryDao uses complex queries (MAX timestamp joins, count aggregations).
 - **data/repository/** — @Singleton repositories wrapping DAOs. Business logic lives here (sort order calculation, timestamp formatting).
 - **di/DatabaseModule.kt** — Hilt module providing AppDatabase and all DAOs at SingletonComponent scope.
@@ -32,13 +32,15 @@ Single-module Android app (`com.easylogger.app`) using single-Activity + Jetpack
 - **ui/navigation/** — NavRoutes sealed class with Main and Detail(categoryId) routes.
 - **export/CsvExporter.kt** — CSV export via SAF with UTF-8 BOM and ISO 8601 timestamps. Columns: category, start_time, end_time, created_at.
 
+**Navigation:** Folder navigation uses a stack (`folderStack: List<FolderStackEntry>`) for arbitrary nesting depth. `enterFolder` pushes, `exitFolder` pops. BackHandler and TopAppBar back button both call `exitFolder()`.
+
 **State management:** ViewModels expose `StateFlow` for UI state and `Channel` for one-shot events. Composables collect via `collectAsStateWithLifecycle()`.
 
 **DI chain:** Hilt `@HiltAndroidApp` → `@AndroidEntryPoint` Activity → `@HiltViewModel` ViewModels (constructor-injected repositories) → `@Singleton` repositories (constructor-injected DAOs).
 
 ## Database
 
-Room database (AppDatabase) at version 3 with exported schemas to `app/schemas/`. Migration 1→2 adds folders table and folderId/folderSortOrder to categories. Migration 2→3 renames `timestamp` to `startTime` and adds nullable `endTime` to log_entries (table rebuild). KSP generates Room code.
+Room database (AppDatabase) at version 4 with exported schemas to `app/schemas/`. Migration 1→2 adds folders table and folderId/folderSortOrder to categories. Migration 2→3 renames `timestamp` to `startTime` and adds nullable `endTime` to log_entries (table rebuild). Migration 3→4 adds parentFolderId and folderSortOrder to folders for nested folder support. KSP generates Room code.
 
 ## Testing
 
@@ -76,6 +78,11 @@ All features from the spec are implemented. The app is production-ready at v1.3.
 **Non-goals** (explicitly out of scope per spec): cloud sync, charts/analytics, reminders/notifications, user accounts, CSV import, color-coding, home screen widget.
 
 ## Changelog
+
+### WIP — feature/nested-folders (branch, not yet merged)
+
+- **Nested folders:** Folders can now contain sub-folders. Folder entity gains `parentFolderId` (self-referential FK, SET_NULL) and `folderSortOrder`. ViewModel navigation uses a folder stack for arbitrary nesting depth. Folder interior shows mixed sub-folders + categories. "Add Folder" button available at all nesting levels. Drag-drop supports folder-onto-folder. FolderListItem/FolderGridCard gain "Remove from Folder" option. Room migration v3→v4. 13 new unit tests.
+- **Remaining work:** QA testing on device, version bump, merge to main.
 
 ### v1.3.0 (2026-03-28) — versionCode 4
 
