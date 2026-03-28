@@ -24,22 +24,30 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
+data class FolderStackEntry(val folderId: Long, val folderName: String)
+
 data class MainScreenState(
     val topLevelItems: List<MainListItem> = emptyList(),
-    val folderCategories: List<CategoryWithLastLog> = emptyList(),
-    val currentFolderId: Long? = null,
-    val currentFolderName: String? = null,
+    val folderItems: List<MainListItem> = emptyList(),
+    val folderStack: List<FolderStackEntry> = emptyList(),
     val viewMode: String = UserPreferenceRepository.VIEW_MODE_LIST,
     val isLoading: Boolean = true,
     val dragOverFolderId: Long? = null
-)
+) {
+    val currentFolderId: Long? get() = folderStack.lastOrNull()?.folderId
+    val currentFolderName: String? get() = folderStack.lastOrNull()?.folderName
+    val isInsideFolder: Boolean get() = folderStack.isNotEmpty()
+}
 
 sealed class MainScreenEvent {
     data class ExportReady(val suggestedFilename: String) : MainScreenEvent()
     data object ExportEmpty : MainScreenEvent()
 }
 
-private data class PendingFolderDrop(val categoryId: Long, val folderId: Long)
+private sealed class PendingFolderDrop {
+    data class CategoryDrop(val categoryId: Long, val folderId: Long) : PendingFolderDrop()
+    data class FolderDrop(val sourceFolderId: Long, val targetFolderId: Long) : PendingFolderDrop()
+}
 
 @OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel
@@ -53,16 +61,15 @@ class CategoryListViewModel @Inject constructor(
     private val _events = Channel<MainScreenEvent>(Channel.BUFFERED)
     val events = _events.receiveAsFlow()
 
-    private val _currentFolderId = MutableStateFlow<Long?>(null)
-    private val _currentFolderName = MutableStateFlow<String?>(null)
+    private val _folderStack = MutableStateFlow<List<FolderStackEntry>>(emptyList())
     private val _reorderedTopLevel = MutableStateFlow<List<MainListItem>?>(null)
-    private val _reorderedFolderCategories = MutableStateFlow<List<CategoryWithLastLog>?>(null)
+    private val _reorderedFolderItems = MutableStateFlow<List<MainListItem>?>(null)
     private val _pendingFolderDrop = MutableStateFlow<PendingFolderDrop?>(null)
     private val _dragOverFolderId = MutableStateFlow<Long?>(null)
 
     private val topLevelFlow = combine(
         categoryRepository.getTopLevelWithLastLog(),
-        folderRepository.getAllWithCount(),
+        folderRepository.getTopLevelWithCount(),
         _reorderedTopLevel
     ) { categories, folders, reordered ->
         if (reordered != null) {
@@ -75,13 +82,22 @@ class CategoryListViewModel @Inject constructor(
         }
     }
 
-    private val folderCategoriesFlow = _currentFolderId.flatMapLatest { folderId ->
+    private val folderItemsFlow = _folderStack.flatMapLatest { stack ->
+        val folderId = stack.lastOrNull()?.folderId
         if (folderId != null) {
             combine(
                 categoryRepository.getCategoriesInFolder(folderId),
-                _reorderedFolderCategories
-            ) { dbCategories, reordered ->
-                reordered ?: dbCategories
+                folderRepository.getFoldersInFolder(folderId),
+                _reorderedFolderItems
+            ) { categories, subFolders, reordered ->
+                if (reordered != null) {
+                    reordered
+                } else {
+                    val items = mutableListOf<MainListItem>()
+                    categories.forEach { items.add(MainListItem.CategoryItem(it)) }
+                    subFolders.forEach { items.add(MainListItem.FolderItem(it)) }
+                    items.sortedBy { it.folderSortOrder }
+                }
             }
         } else {
             flowOf(emptyList())
@@ -90,26 +106,24 @@ class CategoryListViewModel @Inject constructor(
 
     val state: StateFlow<MainScreenState> = combine(
         topLevelFlow,
-        folderCategoriesFlow,
+        folderItemsFlow,
         userPreferenceRepository.getViewMode(),
-        _currentFolderId,
-        _currentFolderName,
+        _folderStack,
         _dragOverFolderId
     ) { args ->
         @Suppress("UNCHECKED_CAST")
         val topLevel = args[0] as List<MainListItem>
         @Suppress("UNCHECKED_CAST")
-        val folderCats = args[1] as List<CategoryWithLastLog>
+        val folderItems = args[1] as List<MainListItem>
         val viewMode = args[2] as String
-        val folderId = args[3] as Long?
-        val folderName = args[4] as String?
-        val dragOver = args[5] as Long?
+        @Suppress("UNCHECKED_CAST")
+        val stack = args[3] as List<FolderStackEntry>
+        val dragOver = args[4] as Long?
 
         MainScreenState(
             topLevelItems = topLevel,
-            folderCategories = folderCats,
-            currentFolderId = folderId,
-            currentFolderName = folderName,
+            folderItems = folderItems,
+            folderStack = stack,
             viewMode = viewMode,
             isLoading = false,
             dragOverFolderId = dragOver
@@ -124,7 +138,8 @@ class CategoryListViewModel @Inject constructor(
 
     fun addCategory(name: String) {
         viewModelScope.launch {
-            categoryRepository.insert(name, _currentFolderId.value)
+            val currentFolder = _folderStack.value.lastOrNull()?.folderId
+            categoryRepository.insert(name, currentFolder)
         }
     }
 
@@ -153,7 +168,12 @@ class CategoryListViewModel @Inject constructor(
 
     fun addFolder(name: String) {
         viewModelScope.launch {
-            folderRepository.insert(name)
+            val currentFolder = _folderStack.value.lastOrNull()?.folderId
+            if (currentFolder != null) {
+                folderRepository.insertInFolder(name, currentFolder)
+            } else {
+                folderRepository.insert(name)
+            }
         }
     }
 
@@ -174,20 +194,29 @@ class CategoryListViewModel @Inject constructor(
 
     fun enterFolder(folderId: Long, folderName: String) {
         _reorderedTopLevel.value = null
-        _currentFolderId.value = folderId
-        _currentFolderName.value = folderName
+        _reorderedFolderItems.value = null
+        _folderStack.value = _folderStack.value + FolderStackEntry(folderId, folderName)
     }
 
     fun exitFolder() {
-        _reorderedFolderCategories.value = null
-        _currentFolderId.value = null
-        _currentFolderName.value = null
+        _reorderedFolderItems.value = null
+        val stack = _folderStack.value
+        _folderStack.value = if (stack.size <= 1) emptyList() else stack.dropLast(1)
+        if (_folderStack.value.isEmpty()) {
+            _reorderedTopLevel.value = null
+        }
+    }
+
+    fun removeFolderFromParent(folderId: Long) {
+        viewModelScope.launch {
+            folderRepository.removeFolderFromParent(folderId)
+        }
     }
 
     // --- Reorder operations ---
 
     fun onReorder(fromIndex: Int, toIndex: Int) {
-        if (_currentFolderId.value != null) {
+        if (_folderStack.value.isNotEmpty()) {
             onReorderInsideFolder(fromIndex, toIndex)
         } else {
             onReorderTopLevel(fromIndex, toIndex)
@@ -199,14 +228,15 @@ class CategoryListViewModel @Inject constructor(
         val draggedItem = current[fromIndex]
         val targetItem = current[toIndex]
 
-        // Always perform the normal swap so dragging feels smooth
         val item = current.removeAt(fromIndex)
         current.add(toIndex, item)
         _reorderedTopLevel.value = current
 
-        // Track if a category is currently hovering over a folder position
         if (draggedItem is MainListItem.CategoryItem && targetItem is MainListItem.FolderItem) {
-            _pendingFolderDrop.value = PendingFolderDrop(draggedItem.data.id, targetItem.data.id)
+            _pendingFolderDrop.value = PendingFolderDrop.CategoryDrop(draggedItem.data.id, targetItem.data.id)
+            _dragOverFolderId.value = targetItem.data.id
+        } else if (draggedItem is MainListItem.FolderItem && targetItem is MainListItem.FolderItem) {
+            _pendingFolderDrop.value = PendingFolderDrop.FolderDrop(draggedItem.data.id, targetItem.data.id)
             _dragOverFolderId.value = targetItem.data.id
         } else {
             _pendingFolderDrop.value = null
@@ -215,25 +245,49 @@ class CategoryListViewModel @Inject constructor(
     }
 
     private fun onReorderInsideFolder(fromIndex: Int, toIndex: Int) {
-        val current = state.value.folderCategories.toMutableList()
+        val current = state.value.folderItems.toMutableList()
+        val draggedItem = current[fromIndex]
+        val targetItem = current[toIndex]
+
         val item = current.removeAt(fromIndex)
         current.add(toIndex, item)
-        _reorderedFolderCategories.value = current
+        _reorderedFolderItems.value = current
+
+        if (targetItem is MainListItem.FolderItem && draggedItem is MainListItem.CategoryItem) {
+            _pendingFolderDrop.value = PendingFolderDrop.CategoryDrop(draggedItem.data.id, targetItem.data.id)
+            _dragOverFolderId.value = targetItem.data.id
+        } else if (targetItem is MainListItem.FolderItem && draggedItem is MainListItem.FolderItem) {
+            _pendingFolderDrop.value = PendingFolderDrop.FolderDrop(draggedItem.data.id, targetItem.data.id)
+            _dragOverFolderId.value = targetItem.data.id
+        } else {
+            _pendingFolderDrop.value = null
+            _dragOverFolderId.value = null
+        }
     }
 
     fun onReorderConfirmed() {
         val drop = _pendingFolderDrop.value
         if (drop != null) {
             viewModelScope.launch {
-                categoryRepository.moveCategoryToFolder(drop.categoryId, drop.folderId)
+                when (drop) {
+                    is PendingFolderDrop.CategoryDrop -> {
+                        categoryRepository.moveCategoryToFolder(drop.categoryId, drop.folderId)
+                    }
+                    is PendingFolderDrop.FolderDrop -> {
+                        if (drop.sourceFolderId != drop.targetFolderId) {
+                            folderRepository.moveFolderToFolder(drop.sourceFolderId, drop.targetFolderId)
+                        }
+                    }
+                }
                 _pendingFolderDrop.value = null
                 _dragOverFolderId.value = null
                 _reorderedTopLevel.value = null
+                _reorderedFolderItems.value = null
             }
             return
         }
 
-        if (_currentFolderId.value != null) {
+        if (_folderStack.value.isNotEmpty()) {
             confirmFolderReorder()
         } else {
             confirmTopLevelReorder()
@@ -268,7 +322,9 @@ class CategoryListViewModel @Inject constructor(
                                 id = fwc.id,
                                 name = fwc.name,
                                 sortOrder = index,
-                                createdAt = fwc.createdAt
+                                createdAt = fwc.createdAt,
+                                parentFolderId = fwc.parentFolderId,
+                                folderSortOrder = fwc.folderSortOrder
                             )
                         )
                     }
@@ -286,20 +342,49 @@ class CategoryListViewModel @Inject constructor(
     }
 
     private fun confirmFolderReorder() {
-        val reordered = _reorderedFolderCategories.value ?: return
+        val reordered = _reorderedFolderItems.value ?: return
         viewModelScope.launch {
-            val updated = reordered.mapIndexed { index, cwl ->
-                Category(
-                    id = cwl.id,
-                    name = cwl.name,
-                    sortOrder = cwl.sortOrder,
-                    createdAt = cwl.createdAt,
-                    folderId = cwl.folderId,
-                    folderSortOrder = index
-                )
+            val updatedCategories = mutableListOf<Category>()
+            val updatedFolders = mutableListOf<Folder>()
+
+            reordered.forEachIndexed { index, item ->
+                when (item) {
+                    is MainListItem.CategoryItem -> {
+                        val cwl = item.data
+                        updatedCategories.add(
+                            Category(
+                                id = cwl.id,
+                                name = cwl.name,
+                                sortOrder = cwl.sortOrder,
+                                createdAt = cwl.createdAt,
+                                folderId = cwl.folderId,
+                                folderSortOrder = index
+                            )
+                        )
+                    }
+                    is MainListItem.FolderItem -> {
+                        val fwc = item.data
+                        updatedFolders.add(
+                            Folder(
+                                id = fwc.id,
+                                name = fwc.name,
+                                sortOrder = fwc.sortOrder,
+                                createdAt = fwc.createdAt,
+                                parentFolderId = fwc.parentFolderId,
+                                folderSortOrder = index
+                            )
+                        )
+                    }
+                }
             }
-            categoryRepository.updateSortOrders(updated)
-            _reorderedFolderCategories.value = null
+
+            if (updatedCategories.isNotEmpty()) {
+                categoryRepository.updateSortOrders(updatedCategories)
+            }
+            if (updatedFolders.isNotEmpty()) {
+                folderRepository.updateSortOrders(updatedFolders)
+            }
+            _reorderedFolderItems.value = null
         }
     }
 

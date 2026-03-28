@@ -39,6 +39,7 @@
     <string name="edit_folder">Edit Folder</string>
     <string name="folder_name_hint">Folder name</string>
     <string name="folder_category_count">%1$d categories</string>
+    <string name="folder_item_count">%1$d items</string>
     <string name="remove_from_folder">Remove from Folder</string>
     <string name="empty_folder_message">This folder is empty. Drag a category here to add it.</string>
 </resources>

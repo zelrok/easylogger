@@ -39,6 +39,7 @@ fun FolderGridCard(
     onClick: () -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
+    onRemoveFromFolder: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     var showMenu by remember { mutableStateOf(false) }
@@ -82,7 +83,7 @@ fun FolderGridCard(
                     modifier = Modifier.padding(top = 4.dp)
                 )
                 Text(
-                    text = stringResource(R.string.folder_category_count, folder.categoryCount),
+                    text = stringResource(R.string.folder_item_count, folder.childCount),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = TextAlign.Center,
@@ -107,6 +108,15 @@ fun FolderGridCard(
                             onEdit()
                         }
                     )
+                    if (onRemoveFromFolder != null) {
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.remove_from_folder)) },
+                            onClick = {
+                                showMenu = false
+                                onRemoveFromFolder()
+                            }
+                        )
+                    }
                     DropdownMenuItem(
                         text = { Text(stringResource(R.string.delete)) },
                         onClick = {
