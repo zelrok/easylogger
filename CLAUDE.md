@@ -23,14 +23,14 @@ Single-module Android app (`com.easylogger.app`) using single-Activity + Jetpack
 
 **Layers:**
 
-- **data/local/entity/** — Room entities: Category, LogEntry, Folder, UserPreference. Category→Folder FK (SET_NULL), LogEntry→Category FK (CASCADE). Folder has self-referential FK (parentFolderId, SET_NULL) for nested folders.
-- **data/local/dao/** — Room DAOs. LogEntryDao exposes `PagingSource` for paged history. CategoryDao uses complex queries (MAX timestamp joins, count aggregations).
+- **data/local/entity/** — Room entities: Category, LogEntry, Folder, Question, Answer, UserPreference. Category→Folder FK (SET_NULL), LogEntry→Category FK (CASCADE), Answer→Question FK (CASCADE). Folder has self-referential FK (parentFolderId, SET_NULL) for nested folders. Question→Folder FK (SET_NULL) for folder membership.
+- **data/local/dao/** — Room DAOs. LogEntryDao and AnswerDao expose `PagingSource` for paged history. CategoryDao and QuestionDao use complex queries (MAX timestamp/answer joins, count aggregations). Sort order queries use 3-way UNION ALL across categories, folders, and questions.
 - **data/repository/** — @Singleton repositories wrapping DAOs. Business logic lives here (sort order calculation, timestamp formatting).
 - **di/DatabaseModule.kt** — Hilt module providing AppDatabase and all DAOs at SingletonComponent scope.
-- **ui/main/** — Home screen: category/folder list+grid with drag-to-reorder, folder navigation via BackHandler.
-- **ui/detail/** — Log history screen: paged entries (Paging 3, 50/page), Log Now (500ms cooldown), Log Start/Stop (time windows), manual date/time entry with start+end.
-- **ui/navigation/** — NavRoutes sealed class with Main and Detail(categoryId) routes.
-- **export/CsvExporter.kt** — CSV export via SAF with UTF-8 BOM and ISO 8601 timestamps. Columns: category, start_time, end_time, created_at.
+- **ui/main/** — Home screen: category/folder/question list+grid with drag-to-reorder, folder navigation via BackHandler. FAB opens chooser menu (Add Category / Add Question).
+- **ui/detail/** — Log history screen: paged entries (Paging 3, 50/page), Log Now (500ms cooldown), Log Start/Stop (time windows), manual date/time entry with start+end. Question detail screen: paged answers with text option buttons or numbered scale buttons.
+- **ui/navigation/** — NavRoutes sealed class with Main, Detail(categoryId), and QuestionDetail(questionId) routes.
+- **export/CsvExporter.kt** — CSV export via SAF with UTF-8 BOM and ISO 8601 timestamps. Log entries: category, start_time, end_time, created_at. Answers: question, answer, answered_at.
 
 **Navigation:** Folder navigation uses a stack (`folderStack: List<FolderStackEntry>`) for arbitrary nesting depth. `enterFolder` pushes, `exitFolder` pops. BackHandler and TopAppBar back button both call `exitFolder()`.
 
@@ -40,7 +40,7 @@ Single-module Android app (`com.easylogger.app`) using single-Activity + Jetpack
 
 ## Database
 
-Room database (AppDatabase) at version 4 with exported schemas to `app/schemas/`. Migration 1→2 adds folders table and folderId/folderSortOrder to categories. Migration 2→3 renames `timestamp` to `startTime` and adds nullable `endTime` to log_entries (table rebuild). Migration 3→4 adds parentFolderId and folderSortOrder to folders for nested folder support. KSP generates Room code.
+Room database (AppDatabase) at version 5 with exported schemas to `app/schemas/`. Migration 1→2 adds folders table and folderId/folderSortOrder to categories. Migration 2→3 renames `timestamp` to `startTime` and adds nullable `endTime` to log_entries (table rebuild). Migration 3→4 adds parentFolderId and folderSortOrder to folders for nested folder support. Migration 4→5 adds questions table (text/scale answer types, folder-aware) and answers table (FK CASCADE to questions). KSP generates Room code.
 
 ## Testing
 
@@ -63,7 +63,7 @@ Android's `versionCode` is an independent integer that increments by 1 with ever
 
 ## Project Status
 
-All features from the spec are implemented. The app is production-ready at v1.4.0 (versionCode 5).
+All features from the spec are implemented. The app is production-ready at v1.5.0 (versionCode 6).
 
 **Known UI polish gaps** (minor, not blocking):
 
@@ -78,6 +78,11 @@ All features from the spec are implemented. The app is production-ready at v1.4.
 **Non-goals** (explicitly out of scope per spec): cloud sync, charts/analytics, reminders/notifications, user accounts, CSV import, color-coding, home screen widget.
 
 ## Changelog
+
+### WIP — feature/questions (branch, not yet merged)
+
+- **Questions:** New item type alongside categories. Questions are text prompts with either predefined text options (e.g., "yes/no") or integer scale answers (e.g., 1-5). Question entity with answerType (TEXT/SCALE), textOptions, scaleMin/scaleMax. Answer entity with FK CASCADE to Question. Questions appear in main list alongside categories, support drag-to-reorder, folder membership, and have dedicated detail screen with paged answer history. FAB becomes chooser menu (Add Category / Add Question). Separate "Export Answers" CSV option. Room migration v4→v5. 18 new unit tests.
+- **Remaining work:** QA testing on device, version bump, merge to main.
 
 ### v1.4.0 (2026-03-29) — versionCode 5
 
