@@ -8,6 +8,7 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.easylogger.app.MainActivity
 import com.easylogger.app.ui.detail.DetailScreen
+import com.easylogger.app.ui.detail.QuestionDetailScreen
 import com.easylogger.app.ui.main.MainScreen
 
 @Composable
@@ -36,6 +37,16 @@ fun AppNavHost(activity: MainActivity) {
             )
         ) {
             DetailScreen(
+                onNavigateBack = { navController.popBackStack() }
+            )
+        }
+        composable(
+            route = NavRoutes.QuestionDetail.route,
+            arguments = listOf(
+                navArgument("questionId") { type = NavType.LongType }
+            )
+        ) {
+            QuestionDetailScreen(
                 onNavigateBack = { navController.popBackStack() }
             )
         }
