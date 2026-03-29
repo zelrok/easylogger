@@ -6,9 +6,12 @@ import com.easylogger.app.data.local.AppDatabase
 import com.easylogger.app.data.local.MIGRATION_1_2
 import com.easylogger.app.data.local.MIGRATION_2_3
 import com.easylogger.app.data.local.MIGRATION_3_4
+import com.easylogger.app.data.local.MIGRATION_4_5
+import com.easylogger.app.data.local.dao.AnswerDao
 import com.easylogger.app.data.local.dao.CategoryDao
 import com.easylogger.app.data.local.dao.FolderDao
 import com.easylogger.app.data.local.dao.LogEntryDao
+import com.easylogger.app.data.local.dao.QuestionDao
 import com.easylogger.app.data.local.dao.UserPreferenceDao
 import dagger.Module
 import dagger.Provides
@@ -28,7 +31,7 @@ object DatabaseModule {
             context,
             AppDatabase::class.java,
             "easylogger.db"
-        ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4).build()
+        ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5).build()
     }
 
     @Provides
@@ -42,4 +45,10 @@ object DatabaseModule {
 
     @Provides
     fun provideFolderDao(database: AppDatabase): FolderDao = database.folderDao()
+
+    @Provides
+    fun provideQuestionDao(database: AppDatabase): QuestionDao = database.questionDao()
+
+    @Provides
+    fun provideAnswerDao(database: AppDatabase): AnswerDao = database.answerDao()
 }

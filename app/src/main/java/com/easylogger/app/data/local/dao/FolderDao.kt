@@ -17,7 +17,8 @@ interface FolderDao {
         """
         SELECT f.id, f.name, f.sortOrder, f.createdAt, f.parentFolderId, f.folderSortOrder,
                (SELECT COUNT(*) FROM categories c WHERE c.folderId = f.id) +
-               (SELECT COUNT(*) FROM folders sf WHERE sf.parentFolderId = f.id) AS childCount
+               (SELECT COUNT(*) FROM folders sf WHERE sf.parentFolderId = f.id) +
+               (SELECT COUNT(*) FROM questions q WHERE q.folderId = f.id) AS childCount
         FROM folders f
         WHERE f.parentFolderId IS NULL
         ORDER BY f.sortOrder ASC, f.createdAt ASC
@@ -29,7 +30,8 @@ interface FolderDao {
         """
         SELECT f.id, f.name, f.sortOrder, f.createdAt, f.parentFolderId, f.folderSortOrder,
                (SELECT COUNT(*) FROM categories c WHERE c.folderId = f.id) +
-               (SELECT COUNT(*) FROM folders sf WHERE sf.parentFolderId = f.id) AS childCount
+               (SELECT COUNT(*) FROM folders sf WHERE sf.parentFolderId = f.id) +
+               (SELECT COUNT(*) FROM questions q WHERE q.folderId = f.id) AS childCount
         FROM folders f
         WHERE f.parentFolderId = :parentFolderId
         ORDER BY f.folderSortOrder ASC, f.createdAt ASC
@@ -43,6 +45,8 @@ interface FolderDao {
             SELECT sortOrder FROM categories WHERE folderId IS NULL
             UNION ALL
             SELECT sortOrder FROM folders WHERE parentFolderId IS NULL
+            UNION ALL
+            SELECT sortOrder FROM questions WHERE folderId IS NULL
         )
         """
     )
@@ -54,6 +58,8 @@ interface FolderDao {
             SELECT folderSortOrder AS ord FROM categories WHERE folderId = :parentFolderId
             UNION ALL
             SELECT folderSortOrder AS ord FROM folders WHERE parentFolderId = :parentFolderId
+            UNION ALL
+            SELECT folderSortOrder AS ord FROM questions WHERE folderId = :parentFolderId
         )
         """
     )

@@ -54,6 +54,8 @@ interface CategoryDao {
             SELECT sortOrder FROM categories WHERE folderId IS NULL
             UNION ALL
             SELECT sortOrder FROM folders WHERE parentFolderId IS NULL
+            UNION ALL
+            SELECT sortOrder FROM questions WHERE folderId IS NULL
         )
         """
     )
@@ -65,6 +67,8 @@ interface CategoryDao {
             SELECT folderSortOrder AS ord FROM categories WHERE folderId = :folderId
             UNION ALL
             SELECT folderSortOrder AS ord FROM folders WHERE parentFolderId = :folderId
+            UNION ALL
+            SELECT folderSortOrder AS ord FROM questions WHERE folderId = :folderId
         )
         """
     )
