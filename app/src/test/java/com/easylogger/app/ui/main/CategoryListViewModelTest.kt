@@ -21,6 +21,7 @@ import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 
@@ -59,6 +60,7 @@ class CategoryListViewModelTest {
         assertEquals(emptyList<Any>(), state.topLevelItems)
         assertEquals("list", state.viewMode)
         assertNull(state.currentFolderId)
+        assertTrue(state.folderStack.isEmpty())
         collectJob.cancel()
     }
 
@@ -87,17 +89,45 @@ class CategoryListViewModelTest {
     }
 
     @Test
-    fun `enterFolder sets currentFolderId`() = runTest {
+    fun `enterFolder pushes to folder stack`() = runTest {
         val collectJob = launch(testDispatcher) { viewModel.state.collect {} }
         viewModel.enterFolder(1L, "Test Folder")
         advanceUntilIdle()
         assertEquals(1L, viewModel.state.value.currentFolderId)
         assertEquals("Test Folder", viewModel.state.value.currentFolderName)
+        assertEquals(1, viewModel.state.value.folderStack.size)
+        assertTrue(viewModel.state.value.isInsideFolder)
         collectJob.cancel()
     }
 
     @Test
-    fun `exitFolder clears currentFolderId`() = runTest {
+    fun `enterFolder twice creates two-deep stack`() = runTest {
+        val collectJob = launch(testDispatcher) { viewModel.state.collect {} }
+        viewModel.enterFolder(1L, "Folder A")
+        viewModel.enterFolder(2L, "Folder B")
+        advanceUntilIdle()
+        assertEquals(2, viewModel.state.value.folderStack.size)
+        assertEquals(2L, viewModel.state.value.currentFolderId)
+        assertEquals("Folder B", viewModel.state.value.currentFolderName)
+        collectJob.cancel()
+    }
+
+    @Test
+    fun `exitFolder pops one level from stack`() = runTest {
+        val collectJob = launch(testDispatcher) { viewModel.state.collect {} }
+        viewModel.enterFolder(1L, "Folder A")
+        viewModel.enterFolder(2L, "Folder B")
+        advanceUntilIdle()
+        viewModel.exitFolder()
+        advanceUntilIdle()
+        assertEquals(1, viewModel.state.value.folderStack.size)
+        assertEquals(1L, viewModel.state.value.currentFolderId)
+        assertEquals("Folder A", viewModel.state.value.currentFolderName)
+        collectJob.cancel()
+    }
+
+    @Test
+    fun `exitFolder from single depth returns to top level`() = runTest {
         val collectJob = launch(testDispatcher) { viewModel.state.collect {} }
         viewModel.enterFolder(1L, "Test Folder")
         advanceUntilIdle()
@@ -105,6 +135,45 @@ class CategoryListViewModelTest {
         advanceUntilIdle()
         assertNull(viewModel.state.value.currentFolderId)
         assertNull(viewModel.state.value.currentFolderName)
+        assertTrue(viewModel.state.value.folderStack.isEmpty())
+        assertFalse(viewModel.state.value.isInsideFolder)
+        collectJob.cancel()
+    }
+
+    @Test
+    fun `addFolder inside folder creates sub-folder`() = runTest {
+        val collectJob = launch(testDispatcher) { viewModel.state.collect {} }
+        viewModel.addFolder("Parent")
+        advanceUntilIdle()
+        val parentFolder = viewModel.state.value.topLevelItems[0] as MainListItem.FolderItem
+        viewModel.enterFolder(parentFolder.data.id, parentFolder.data.name)
+        advanceUntilIdle()
+        viewModel.addFolder("Child")
+        advanceUntilIdle()
+        val folderItems = viewModel.state.value.folderItems
+        assertEquals(1, folderItems.size)
+        val child = folderItems[0] as MainListItem.FolderItem
+        assertEquals("Child", child.data.name)
+        collectJob.cancel()
+    }
+
+    @Test
+    fun `folderItems shows sub-folders and categories`() = runTest {
+        val collectJob = launch(testDispatcher) { viewModel.state.collect {} }
+        viewModel.addFolder("Parent")
+        advanceUntilIdle()
+        val parentFolder = viewModel.state.value.topLevelItems[0] as MainListItem.FolderItem
+        viewModel.enterFolder(parentFolder.data.id, parentFolder.data.name)
+        advanceUntilIdle()
+        viewModel.addCategory("Cat Inside")
+        viewModel.addFolder("Sub Folder")
+        advanceUntilIdle()
+        val folderItems = viewModel.state.value.folderItems
+        assertEquals(2, folderItems.size)
+        val hasCategory = folderItems.any { it is MainListItem.CategoryItem }
+        val hasFolder = folderItems.any { it is MainListItem.FolderItem }
+        assertTrue(hasCategory)
+        assertTrue(hasFolder)
         collectJob.cancel()
     }
 

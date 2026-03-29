@@ -15,24 +15,49 @@ interface FolderDao {
 
     @Query(
         """
-        SELECT f.id, f.name, f.sortOrder, f.createdAt,
-               (SELECT COUNT(*) FROM categories c WHERE c.folderId = f.id) AS categoryCount
+        SELECT f.id, f.name, f.sortOrder, f.createdAt, f.parentFolderId, f.folderSortOrder,
+               (SELECT COUNT(*) FROM categories c WHERE c.folderId = f.id) +
+               (SELECT COUNT(*) FROM folders sf WHERE sf.parentFolderId = f.id) AS childCount
         FROM folders f
+        WHERE f.parentFolderId IS NULL
         ORDER BY f.sortOrder ASC, f.createdAt ASC
         """
     )
-    fun getAllWithCount(): Flow<List<FolderWithCount>>
+    fun getTopLevelWithCount(): Flow<List<FolderWithCount>>
+
+    @Query(
+        """
+        SELECT f.id, f.name, f.sortOrder, f.createdAt, f.parentFolderId, f.folderSortOrder,
+               (SELECT COUNT(*) FROM categories c WHERE c.folderId = f.id) +
+               (SELECT COUNT(*) FROM folders sf WHERE sf.parentFolderId = f.id) AS childCount
+        FROM folders f
+        WHERE f.parentFolderId = :parentFolderId
+        ORDER BY f.folderSortOrder ASC, f.createdAt ASC
+        """
+    )
+    fun getFoldersInFolder(parentFolderId: Long): Flow<List<FolderWithCount>>
 
     @Query(
         """
         SELECT COALESCE(MAX(sortOrder), -1) + 1 FROM (
             SELECT sortOrder FROM categories WHERE folderId IS NULL
             UNION ALL
-            SELECT sortOrder FROM folders
+            SELECT sortOrder FROM folders WHERE parentFolderId IS NULL
         )
         """
     )
     suspend fun getNextTopLevelSortOrder(): Int
+
+    @Query(
+        """
+        SELECT COALESCE(MAX(ord), -1) + 1 FROM (
+            SELECT folderSortOrder AS ord FROM categories WHERE folderId = :parentFolderId
+            UNION ALL
+            SELECT folderSortOrder AS ord FROM folders WHERE parentFolderId = :parentFolderId
+        )
+        """
+    )
+    suspend fun getNextFolderSortOrder(parentFolderId: Long): Int
 
     @Query("SELECT * FROM folders WHERE id = :id")
     suspend fun getById(id: Long): Folder?
@@ -48,4 +73,10 @@ interface FolderDao {
 
     @Delete
     suspend fun delete(folder: Folder)
+
+    @Query("UPDATE folders SET parentFolderId = :parentFolderId, folderSortOrder = :folderSortOrder WHERE id = :folderId")
+    suspend fun moveFolderToFolder(folderId: Long, parentFolderId: Long, folderSortOrder: Int)
+
+    @Query("UPDATE folders SET parentFolderId = NULL, folderSortOrder = 0, sortOrder = :newSortOrder WHERE id = :folderId")
+    suspend fun removeFolderFromParent(folderId: Long, newSortOrder: Int)
 }

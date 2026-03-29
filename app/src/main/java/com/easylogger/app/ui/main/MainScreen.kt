@@ -80,7 +80,7 @@ fun MainScreen(
     val exportSuccessMsg = stringResource(R.string.export_success)
 
     // Handle back press when inside a folder
-    if (state.currentFolderId != null) {
+    if (state.isInsideFolder) {
         BackHandler { viewModel.exitFolder() }
     }
 
@@ -112,7 +112,7 @@ fun MainScreen(
         topBar = {
             TopAppBar(
                 navigationIcon = {
-                    if (state.currentFolderId != null) {
+                    if (state.isInsideFolder) {
                         IconButton(onClick = { viewModel.exitFolder() }) {
                             Icon(
                                 Icons.AutoMirrored.Filled.ArrowBack,
@@ -122,7 +122,7 @@ fun MainScreen(
                     }
                 },
                 title = {
-                    if (state.currentFolderId != null) {
+                    if (state.isInsideFolder) {
                         Text(state.currentFolderName ?: "")
                     } else {
                         val context = LocalContext.current
@@ -132,13 +132,11 @@ fun MainScreen(
                     }
                 },
                 actions = {
-                    if (state.currentFolderId == null) {
-                        IconButton(onClick = { showAddFolderDialog = true }) {
-                            Icon(
-                                Icons.Default.CreateNewFolder,
-                                contentDescription = stringResource(R.string.add_folder)
-                            )
-                        }
+                    IconButton(onClick = { showAddFolderDialog = true }) {
+                        Icon(
+                            Icons.Default.CreateNewFolder,
+                            contentDescription = stringResource(R.string.add_folder)
+                        )
                     }
                     IconButton(onClick = { viewModel.toggleViewMode() }) {
                         Icon(
@@ -184,36 +182,46 @@ fun MainScreen(
         }
     ) { padding ->
         Crossfade(
-            targetState = "${state.viewMode}_${state.currentFolderId}",
+            targetState = "${state.viewMode}_${state.folderStack.size}_${state.currentFolderId}",
             modifier = Modifier.padding(padding),
             label = "viewMode"
         ) { targetKey ->
-            val isInsideFolder = state.currentFolderId != null
+            val isInsideFolder = state.isInsideFolder
             val isListMode = state.viewMode == UserPreferenceRepository.VIEW_MODE_LIST
 
             if (!isInsideFolder && state.topLevelItems.isEmpty() && !state.isLoading) {
                 EmptyState(message = stringResource(R.string.empty_state_message))
-            } else if (isInsideFolder && state.folderCategories.isEmpty() && !state.isLoading) {
+            } else if (isInsideFolder && state.folderItems.isEmpty() && !state.isLoading) {
                 EmptyState(message = stringResource(R.string.empty_folder_message))
             } else if (isInsideFolder) {
-                // Inside a folder — show categories only
+                // Inside a folder — show mixed sub-folders + categories
                 if (isListMode) {
-                    FolderCategoryList(
-                        categories = state.folderCategories,
+                    FolderContentList(
+                        items = state.folderItems,
+                        dragOverFolderId = state.dragOverFolderId,
                         onCategoryClick = onCategoryClick,
-                        onEdit = { editingCategory = it },
-                        onDelete = { deletingCategory = it },
-                        onRemoveFromFolder = { viewModel.removeCategoryFromFolder(it.id) },
+                        onEditCategory = { editingCategory = it },
+                        onDeleteCategory = { deletingCategory = it },
+                        onRemoveCategoryFromFolder = { viewModel.removeCategoryFromFolder(it.id) },
+                        onFolderClick = { viewModel.enterFolder(it.id, it.name) },
+                        onEditFolder = { editingFolder = it },
+                        onDeleteFolder = { deletingFolder = it },
+                        onRemoveFolderFromParent = { viewModel.removeFolderFromParent(it.id) },
                         onReorder = viewModel::onReorder,
                         onReorderConfirmed = viewModel::onReorderConfirmed
                     )
                 } else {
-                    FolderCategoryGrid(
-                        categories = state.folderCategories,
+                    FolderContentGrid(
+                        items = state.folderItems,
+                        dragOverFolderId = state.dragOverFolderId,
                         onCategoryClick = onCategoryClick,
-                        onEdit = { editingCategory = it },
-                        onDelete = { deletingCategory = it },
-                        onRemoveFromFolder = { viewModel.removeCategoryFromFolder(it.id) },
+                        onEditCategory = { editingCategory = it },
+                        onDeleteCategory = { deletingCategory = it },
+                        onRemoveCategoryFromFolder = { viewModel.removeCategoryFromFolder(it.id) },
+                        onFolderClick = { viewModel.enterFolder(it.id, it.name) },
+                        onEditFolder = { editingFolder = it },
+                        onDeleteFolder = { deletingFolder = it },
+                        onRemoveFolderFromParent = { viewModel.removeFolderFromParent(it.id) },
                         onReorder = viewModel::onReorder,
                         onReorderConfirmed = viewModel::onReorderConfirmed
                     )
@@ -303,7 +311,9 @@ fun MainScreen(
                         id = folder.id,
                         name = name,
                         sortOrder = folder.sortOrder,
-                        createdAt = folder.createdAt
+                        createdAt = folder.createdAt,
+                        parentFolderId = folder.parentFolderId,
+                        folderSortOrder = folder.folderSortOrder
                     )
                 )
                 editingFolder = null
@@ -476,15 +486,20 @@ private fun TopLevelGrid(
     }
 }
 
-// --- Folder-interior list composable ---
+// --- Folder-interior list composable (mixed sub-folders + categories) ---
 
 @Composable
-private fun FolderCategoryList(
-    categories: List<CategoryWithLastLog>,
+private fun FolderContentList(
+    items: List<MainListItem>,
+    dragOverFolderId: Long?,
     onCategoryClick: (Long) -> Unit,
-    onEdit: (CategoryWithLastLog) -> Unit,
-    onDelete: (CategoryWithLastLog) -> Unit,
-    onRemoveFromFolder: (CategoryWithLastLog) -> Unit,
+    onEditCategory: (CategoryWithLastLog) -> Unit,
+    onDeleteCategory: (CategoryWithLastLog) -> Unit,
+    onRemoveCategoryFromFolder: (CategoryWithLastLog) -> Unit,
+    onFolderClick: (FolderWithCount) -> Unit,
+    onEditFolder: (FolderWithCount) -> Unit,
+    onDeleteFolder: (FolderWithCount) -> Unit,
+    onRemoveFolderFromParent: (FolderWithCount) -> Unit,
     onReorder: (Int, Int) -> Unit,
     onReorderConfirmed: () -> Unit
 ) {
@@ -498,38 +513,72 @@ private fun FolderCategoryList(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(vertical = 8.dp)
     ) {
-        items(categories, key = { it.id }) { category ->
-            ReorderableItem(reorderableState, key = category.id) { isDragging ->
+        items(items, key = { it.itemKey }) { item ->
+            ReorderableItem(reorderableState, key = item.itemKey) { isDragging ->
                 val elevation by animateDpAsState(
                     if (isDragging) 8.dp else 0.dp,
                     label = "dragElevation"
                 )
-                CategoryListItem(
-                    category = category,
-                    onClick = { onCategoryClick(category.id) },
-                    onEdit = { onEdit(category) },
-                    onDelete = { onDelete(category) },
-                    onRemoveFromFolder = { onRemoveFromFolder(category) },
-                    modifier = Modifier
-                        .shadow(elevation)
-                        .longPressDraggableHandle(
-                            onDragStopped = { onReorderConfirmed() }
+                when (item) {
+                    is MainListItem.CategoryItem -> {
+                        CategoryListItem(
+                            category = item.data,
+                            onClick = { onCategoryClick(item.data.id) },
+                            onEdit = { onEditCategory(item.data) },
+                            onDelete = { onDeleteCategory(item.data) },
+                            onRemoveFromFolder = { onRemoveCategoryFromFolder(item.data) },
+                            modifier = Modifier
+                                .shadow(elevation)
+                                .longPressDraggableHandle(
+                                    onDragStopped = { onReorderConfirmed() }
+                                )
                         )
-                )
+                    }
+                    is MainListItem.FolderItem -> {
+                        val isDropTarget = dragOverFolderId == item.data.id
+                        FolderListItem(
+                            folder = item.data,
+                            isDropTarget = isDropTarget,
+                            onClick = { onFolderClick(item.data) },
+                            onEdit = { onEditFolder(item.data) },
+                            onDelete = { onDeleteFolder(item.data) },
+                            onRemoveFromFolder = { onRemoveFolderFromParent(item.data) },
+                            modifier = Modifier
+                                .shadow(elevation)
+                                .then(
+                                    if (isDropTarget) {
+                                        Modifier.background(
+                                            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
+                                        )
+                                    } else {
+                                        Modifier
+                                    }
+                                )
+                                .longPressDraggableHandle(
+                                    onDragStopped = { onReorderConfirmed() }
+                                )
+                        )
+                    }
+                }
             }
         }
     }
 }
 
-// --- Folder-interior grid composable ---
+// --- Folder-interior grid composable (mixed sub-folders + categories) ---
 
 @Composable
-private fun FolderCategoryGrid(
-    categories: List<CategoryWithLastLog>,
+private fun FolderContentGrid(
+    items: List<MainListItem>,
+    dragOverFolderId: Long?,
     onCategoryClick: (Long) -> Unit,
-    onEdit: (CategoryWithLastLog) -> Unit,
-    onDelete: (CategoryWithLastLog) -> Unit,
-    onRemoveFromFolder: (CategoryWithLastLog) -> Unit,
+    onEditCategory: (CategoryWithLastLog) -> Unit,
+    onDeleteCategory: (CategoryWithLastLog) -> Unit,
+    onRemoveCategoryFromFolder: (CategoryWithLastLog) -> Unit,
+    onFolderClick: (FolderWithCount) -> Unit,
+    onEditFolder: (FolderWithCount) -> Unit,
+    onDeleteFolder: (FolderWithCount) -> Unit,
+    onRemoveFolderFromParent: (FolderWithCount) -> Unit,
     onReorder: (Int, Int) -> Unit,
     onReorderConfirmed: () -> Unit
 ) {
@@ -544,24 +593,44 @@ private fun FolderCategoryGrid(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(8.dp)
     ) {
-        items(categories, key = { it.id }) { category ->
-            ReorderableItem(reorderableGridState, key = category.id) { isDragging ->
+        items(items, key = { it.itemKey }) { item ->
+            ReorderableItem(reorderableGridState, key = item.itemKey) { isDragging ->
                 val elevation by animateDpAsState(
                     if (isDragging) 8.dp else 1.dp,
                     label = "dragElevation"
                 )
-                CategoryGridCard(
-                    category = category,
-                    onClick = { onCategoryClick(category.id) },
-                    onEdit = { onEdit(category) },
-                    onDelete = { onDelete(category) },
-                    onRemoveFromFolder = { onRemoveFromFolder(category) },
-                    modifier = Modifier
-                        .shadow(elevation, shape = MaterialTheme.shapes.medium)
-                        .longPressDraggableHandle(
-                            onDragStopped = { onReorderConfirmed() }
+                when (item) {
+                    is MainListItem.CategoryItem -> {
+                        CategoryGridCard(
+                            category = item.data,
+                            onClick = { onCategoryClick(item.data.id) },
+                            onEdit = { onEditCategory(item.data) },
+                            onDelete = { onDeleteCategory(item.data) },
+                            onRemoveFromFolder = { onRemoveCategoryFromFolder(item.data) },
+                            modifier = Modifier
+                                .shadow(elevation, shape = MaterialTheme.shapes.medium)
+                                .longPressDraggableHandle(
+                                    onDragStopped = { onReorderConfirmed() }
+                                )
                         )
-                )
+                    }
+                    is MainListItem.FolderItem -> {
+                        val isDropTarget = dragOverFolderId == item.data.id
+                        FolderGridCard(
+                            folder = item.data,
+                            isDropTarget = isDropTarget,
+                            onClick = { onFolderClick(item.data) },
+                            onEdit = { onEditFolder(item.data) },
+                            onDelete = { onDeleteFolder(item.data) },
+                            onRemoveFromFolder = { onRemoveFolderFromParent(item.data) },
+                            modifier = Modifier
+                                .shadow(elevation, shape = MaterialTheme.shapes.medium)
+                                .longPressDraggableHandle(
+                                    onDragStopped = { onReorderConfirmed() }
+                                )
+                        )
+                    }
+                }
             }
         }
     }

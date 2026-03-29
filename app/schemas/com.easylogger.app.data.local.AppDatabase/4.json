@@ -1,8 +1,8 @@
 {
   "formatVersion": 1,
   "database": {
-    "version": 3,
-    "identityHash": "cc21b9a3d6c404e0208930ad19884ab4",
+    "version": 4,
+    "identityHash": "39a1f7dff296ce4294747641982812a1",
     "entities": [
       {
         "tableName": "categories",
@@ -78,7 +78,7 @@
       },
       {
         "tableName": "log_entries",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `categoryId` INTEGER NOT NULL, `timestamp` INTEGER NOT NULL, `createdAt` INTEGER NOT NULL, FOREIGN KEY(`categoryId`) REFERENCES `categories`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `categoryId` INTEGER NOT NULL, `startTime` INTEGER NOT NULL, `endTime` INTEGER, `createdAt` INTEGER NOT NULL, FOREIGN KEY(`categoryId`) REFERENCES `categories`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
         "fields": [
           {
             "fieldPath": "id",
@@ -93,10 +93,16 @@
             "notNull": true
           },
           {
-            "fieldPath": "timestamp",
-            "columnName": "timestamp",
+            "fieldPath": "startTime",
+            "columnName": "startTime",
             "affinity": "INTEGER",
             "notNull": true
+          },
+          {
+            "fieldPath": "endTime",
+            "columnName": "endTime",
+            "affinity": "INTEGER",
+            "notNull": false
           },
           {
             "fieldPath": "createdAt",
@@ -238,7 +244,7 @@
     "views": [],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'cc21b9a3d6c404e0208930ad19884ab4')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '39a1f7dff296ce4294747641982812a1')"
     ]
   }
 }
