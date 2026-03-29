@@ -6,9 +6,13 @@ import com.easylogger.app.data.local.entity.Category
 import com.easylogger.app.data.local.entity.CategoryWithLastLog
 import com.easylogger.app.data.local.entity.Folder
 import com.easylogger.app.data.local.entity.FolderWithCount
+import com.easylogger.app.data.local.entity.Question
+import com.easylogger.app.data.local.entity.QuestionWithLastAnswer
+import com.easylogger.app.data.repository.AnswerRepository
 import com.easylogger.app.data.repository.CategoryRepository
 import com.easylogger.app.data.repository.FolderRepository
 import com.easylogger.app.data.repository.LogEntryRepository
+import com.easylogger.app.data.repository.QuestionRepository
 import com.easylogger.app.data.repository.UserPreferenceRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -41,12 +45,15 @@ data class MainScreenState(
 
 sealed class MainScreenEvent {
     data class ExportReady(val suggestedFilename: String) : MainScreenEvent()
+    data class AnswerExportReady(val suggestedFilename: String) : MainScreenEvent()
     data object ExportEmpty : MainScreenEvent()
+    data object AnswerExportEmpty : MainScreenEvent()
 }
 
 private sealed class PendingFolderDrop {
     data class CategoryDrop(val categoryId: Long, val folderId: Long) : PendingFolderDrop()
     data class FolderDrop(val sourceFolderId: Long, val targetFolderId: Long) : PendingFolderDrop()
+    data class QuestionDrop(val questionId: Long, val folderId: Long) : PendingFolderDrop()
 }
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -55,6 +62,8 @@ class CategoryListViewModel @Inject constructor(
     private val categoryRepository: CategoryRepository,
     private val folderRepository: FolderRepository,
     private val logEntryRepository: LogEntryRepository,
+    private val questionRepository: QuestionRepository,
+    private val answerRepository: AnswerRepository,
     private val userPreferenceRepository: UserPreferenceRepository
 ) : ViewModel() {
 
@@ -70,14 +79,16 @@ class CategoryListViewModel @Inject constructor(
     private val topLevelFlow = combine(
         categoryRepository.getTopLevelWithLastLog(),
         folderRepository.getTopLevelWithCount(),
+        questionRepository.getTopLevelWithLastAnswer(),
         _reorderedTopLevel
-    ) { categories, folders, reordered ->
+    ) { categories, folders, questions, reordered ->
         if (reordered != null) {
             reordered
         } else {
             val items = mutableListOf<MainListItem>()
             categories.forEach { items.add(MainListItem.CategoryItem(it)) }
             folders.forEach { items.add(MainListItem.FolderItem(it)) }
+            questions.forEach { items.add(MainListItem.QuestionItem(it)) }
             items.sortedBy { it.sortOrder }
         }
     }
@@ -88,14 +99,16 @@ class CategoryListViewModel @Inject constructor(
             combine(
                 categoryRepository.getCategoriesInFolder(folderId),
                 folderRepository.getFoldersInFolder(folderId),
+                questionRepository.getQuestionsInFolder(folderId),
                 _reorderedFolderItems
-            ) { categories, subFolders, reordered ->
+            ) { categories, subFolders, questions, reordered ->
                 if (reordered != null) {
                     reordered
                 } else {
                     val items = mutableListOf<MainListItem>()
                     categories.forEach { items.add(MainListItem.CategoryItem(it)) }
                     subFolders.forEach { items.add(MainListItem.FolderItem(it)) }
+                    questions.forEach { items.add(MainListItem.QuestionItem(it)) }
                     items.sortedBy { it.folderSortOrder }
                 }
             }
@@ -213,6 +226,42 @@ class CategoryListViewModel @Inject constructor(
         }
     }
 
+    // --- Question operations ---
+
+    fun addQuestion(
+        name: String,
+        answerType: String,
+        textOptions: String?,
+        scaleMin: Int,
+        scaleMax: Int
+    ) {
+        viewModelScope.launch {
+            val currentFolder = _folderStack.value.lastOrNull()?.folderId
+            questionRepository.insert(name, answerType, textOptions, scaleMin, scaleMax, currentFolder)
+        }
+    }
+
+    fun updateQuestion(question: Question) {
+        viewModelScope.launch {
+            questionRepository.update(question)
+        }
+    }
+
+    fun deleteQuestion(question: QuestionWithLastAnswer) {
+        viewModelScope.launch {
+            val q = questionRepository.getById(question.id)
+            if (q != null) {
+                questionRepository.delete(q)
+            }
+        }
+    }
+
+    fun removeQuestionFromFolder(questionId: Long) {
+        viewModelScope.launch {
+            questionRepository.removeQuestionFromFolder(questionId)
+        }
+    }
+
     // --- Reorder operations ---
 
     fun onReorder(fromIndex: Int, toIndex: Int) {
@@ -232,12 +281,21 @@ class CategoryListViewModel @Inject constructor(
         current.add(toIndex, item)
         _reorderedTopLevel.value = current
 
-        if (draggedItem is MainListItem.CategoryItem && targetItem is MainListItem.FolderItem) {
-            _pendingFolderDrop.value = PendingFolderDrop.CategoryDrop(draggedItem.data.id, targetItem.data.id)
-            _dragOverFolderId.value = targetItem.data.id
-        } else if (draggedItem is MainListItem.FolderItem && targetItem is MainListItem.FolderItem) {
-            _pendingFolderDrop.value = PendingFolderDrop.FolderDrop(draggedItem.data.id, targetItem.data.id)
-            _dragOverFolderId.value = targetItem.data.id
+        if (targetItem is MainListItem.FolderItem) {
+            when (draggedItem) {
+                is MainListItem.CategoryItem -> {
+                    _pendingFolderDrop.value = PendingFolderDrop.CategoryDrop(draggedItem.data.id, targetItem.data.id)
+                    _dragOverFolderId.value = targetItem.data.id
+                }
+                is MainListItem.FolderItem -> {
+                    _pendingFolderDrop.value = PendingFolderDrop.FolderDrop(draggedItem.data.id, targetItem.data.id)
+                    _dragOverFolderId.value = targetItem.data.id
+                }
+                is MainListItem.QuestionItem -> {
+                    _pendingFolderDrop.value = PendingFolderDrop.QuestionDrop(draggedItem.data.id, targetItem.data.id)
+                    _dragOverFolderId.value = targetItem.data.id
+                }
+            }
         } else {
             _pendingFolderDrop.value = null
             _dragOverFolderId.value = null
@@ -253,12 +311,21 @@ class CategoryListViewModel @Inject constructor(
         current.add(toIndex, item)
         _reorderedFolderItems.value = current
 
-        if (targetItem is MainListItem.FolderItem && draggedItem is MainListItem.CategoryItem) {
-            _pendingFolderDrop.value = PendingFolderDrop.CategoryDrop(draggedItem.data.id, targetItem.data.id)
-            _dragOverFolderId.value = targetItem.data.id
-        } else if (targetItem is MainListItem.FolderItem && draggedItem is MainListItem.FolderItem) {
-            _pendingFolderDrop.value = PendingFolderDrop.FolderDrop(draggedItem.data.id, targetItem.data.id)
-            _dragOverFolderId.value = targetItem.data.id
+        if (targetItem is MainListItem.FolderItem) {
+            when (draggedItem) {
+                is MainListItem.CategoryItem -> {
+                    _pendingFolderDrop.value = PendingFolderDrop.CategoryDrop(draggedItem.data.id, targetItem.data.id)
+                    _dragOverFolderId.value = targetItem.data.id
+                }
+                is MainListItem.FolderItem -> {
+                    _pendingFolderDrop.value = PendingFolderDrop.FolderDrop(draggedItem.data.id, targetItem.data.id)
+                    _dragOverFolderId.value = targetItem.data.id
+                }
+                is MainListItem.QuestionItem -> {
+                    _pendingFolderDrop.value = PendingFolderDrop.QuestionDrop(draggedItem.data.id, targetItem.data.id)
+                    _dragOverFolderId.value = targetItem.data.id
+                }
+            }
         } else {
             _pendingFolderDrop.value = null
             _dragOverFolderId.value = null
@@ -277,6 +344,9 @@ class CategoryListViewModel @Inject constructor(
                         if (drop.sourceFolderId != drop.targetFolderId) {
                             folderRepository.moveFolderToFolder(drop.sourceFolderId, drop.targetFolderId)
                         }
+                    }
+                    is PendingFolderDrop.QuestionDrop -> {
+                        questionRepository.moveQuestionToFolder(drop.questionId, drop.folderId)
                     }
                 }
                 _pendingFolderDrop.value = null
@@ -299,6 +369,7 @@ class CategoryListViewModel @Inject constructor(
         viewModelScope.launch {
             val updatedCategories = mutableListOf<Category>()
             val updatedFolders = mutableListOf<Folder>()
+            val updatedQuestions = mutableListOf<Question>()
 
             reordered.forEachIndexed { index, item ->
                 when (item) {
@@ -328,6 +399,23 @@ class CategoryListViewModel @Inject constructor(
                             )
                         )
                     }
+                    is MainListItem.QuestionItem -> {
+                        val qwa = item.data
+                        updatedQuestions.add(
+                            Question(
+                                id = qwa.id,
+                                name = qwa.name,
+                                answerType = qwa.answerType,
+                                textOptions = qwa.textOptions,
+                                scaleMin = qwa.scaleMin,
+                                scaleMax = qwa.scaleMax,
+                                sortOrder = index,
+                                createdAt = qwa.createdAt,
+                                folderId = qwa.folderId,
+                                folderSortOrder = qwa.folderSortOrder
+                            )
+                        )
+                    }
                 }
             }
 
@@ -336,6 +424,9 @@ class CategoryListViewModel @Inject constructor(
             }
             if (updatedFolders.isNotEmpty()) {
                 folderRepository.updateSortOrders(updatedFolders)
+            }
+            if (updatedQuestions.isNotEmpty()) {
+                questionRepository.updateSortOrders(updatedQuestions)
             }
             _reorderedTopLevel.value = null
         }
@@ -346,6 +437,7 @@ class CategoryListViewModel @Inject constructor(
         viewModelScope.launch {
             val updatedCategories = mutableListOf<Category>()
             val updatedFolders = mutableListOf<Folder>()
+            val updatedQuestions = mutableListOf<Question>()
 
             reordered.forEachIndexed { index, item ->
                 when (item) {
@@ -375,6 +467,23 @@ class CategoryListViewModel @Inject constructor(
                             )
                         )
                     }
+                    is MainListItem.QuestionItem -> {
+                        val qwa = item.data
+                        updatedQuestions.add(
+                            Question(
+                                id = qwa.id,
+                                name = qwa.name,
+                                answerType = qwa.answerType,
+                                textOptions = qwa.textOptions,
+                                scaleMin = qwa.scaleMin,
+                                scaleMax = qwa.scaleMax,
+                                sortOrder = qwa.sortOrder,
+                                createdAt = qwa.createdAt,
+                                folderId = qwa.folderId,
+                                folderSortOrder = index
+                            )
+                        )
+                    }
                 }
             }
 
@@ -383,6 +492,9 @@ class CategoryListViewModel @Inject constructor(
             }
             if (updatedFolders.isNotEmpty()) {
                 folderRepository.updateSortOrders(updatedFolders)
+            }
+            if (updatedQuestions.isNotEmpty()) {
+                questionRepository.updateSortOrders(updatedQuestions)
             }
             _reorderedFolderItems.value = null
         }
@@ -416,6 +528,22 @@ class CategoryListViewModel @Inject constructor(
                 ).format(java.util.Date())
                 val filename = "easylogger_export_$timestamp.csv"
                 _events.send(MainScreenEvent.ExportReady(filename))
+            }
+        }
+    }
+
+    fun requestAnswerExport() {
+        viewModelScope.launch {
+            val answers = answerRepository.getAll()
+            if (answers.isEmpty()) {
+                _events.send(MainScreenEvent.AnswerExportEmpty)
+            } else {
+                val timestamp = java.text.SimpleDateFormat(
+                    "yyyyMMdd_HHmmss",
+                    java.util.Locale.US
+                ).format(java.util.Date())
+                val filename = "easylogger_answers_$timestamp.csv"
+                _events.send(MainScreenEvent.AnswerExportReady(filename))
             }
         }
     }

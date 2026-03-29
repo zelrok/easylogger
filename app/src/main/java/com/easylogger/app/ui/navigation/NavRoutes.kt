@@ -5,4 +5,7 @@ sealed class NavRoutes(val route: String) {
     data object Detail : NavRoutes("detail/{categoryId}") {
         fun createRoute(categoryId: Long) = "detail/$categoryId"
     }
+    data object QuestionDetail : NavRoutes("question/{questionId}") {
+        fun createRoute(questionId: Long) = "question/$questionId"
+    }
 }

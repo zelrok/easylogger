@@ -42,4 +42,20 @@
     <string name="folder_item_count">%1$d items</string>
     <string name="remove_from_folder">Remove from Folder</string>
     <string name="empty_folder_message">This folder is empty. Drag a category here to add it.</string>
+    <string name="add_question">Add Question</string>
+    <string name="edit_question">Edit Question</string>
+    <string name="question_name_hint">Question text</string>
+    <string name="answer_type_text">Text Options</string>
+    <string name="answer_type_scale">Number Scale</string>
+    <string name="text_options_hint">Options (comma-separated)</string>
+    <string name="scale_min_hint">Min</string>
+    <string name="scale_max_hint">Max</string>
+    <string name="no_answers_yet">No answers yet</string>
+    <string name="empty_answers_message">No answers yet. Choose an answer below to log your first.</string>
+    <string name="delete_question_confirm">Delete \"%1$s\" and all its answers?</string>
+    <string name="answered_at">Answered at %1$s</string>
+    <string name="add_item">Add item</string>
+    <string name="export_answers_csv">Export Answers</string>
+    <string name="answer_export_empty">No answers to export yet.</string>
+    <string name="answer_export_success">Exported %1$d answers to %2$s</string>
 </resources>

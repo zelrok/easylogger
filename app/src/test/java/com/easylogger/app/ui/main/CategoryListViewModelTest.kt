@@ -1,12 +1,16 @@
 package com.easylogger.app.ui.main
 
+import com.easylogger.app.data.repository.AnswerRepository
 import com.easylogger.app.data.repository.CategoryRepository
+import com.easylogger.app.data.repository.FakeAnswerDao
 import com.easylogger.app.data.repository.FakeCategoryDao
 import com.easylogger.app.data.repository.FakeFolderDao
 import com.easylogger.app.data.repository.FakeLogEntryDao
+import com.easylogger.app.data.repository.FakeQuestionDao
 import com.easylogger.app.data.repository.FakeUserPreferenceDao
 import com.easylogger.app.data.repository.FolderRepository
 import com.easylogger.app.data.repository.LogEntryRepository
+import com.easylogger.app.data.repository.QuestionRepository
 import com.easylogger.app.data.repository.UserPreferenceRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -33,6 +37,8 @@ class CategoryListViewModelTest {
     private lateinit var categoryRepository: CategoryRepository
     private lateinit var folderRepository: FolderRepository
     private lateinit var logEntryRepository: LogEntryRepository
+    private lateinit var questionRepository: QuestionRepository
+    private lateinit var answerRepository: AnswerRepository
     private lateinit var userPreferenceRepository: UserPreferenceRepository
 
     @Before
@@ -41,9 +47,12 @@ class CategoryListViewModelTest {
         categoryRepository = CategoryRepository(FakeCategoryDao())
         folderRepository = FolderRepository(FakeFolderDao())
         logEntryRepository = LogEntryRepository(FakeLogEntryDao())
+        questionRepository = QuestionRepository(FakeQuestionDao())
+        answerRepository = AnswerRepository(FakeAnswerDao())
         userPreferenceRepository = UserPreferenceRepository(FakeUserPreferenceDao())
         viewModel = CategoryListViewModel(
-            categoryRepository, folderRepository, logEntryRepository, userPreferenceRepository
+            categoryRepository, folderRepository, logEntryRepository,
+            questionRepository, answerRepository, userPreferenceRepository
         )
     }
 

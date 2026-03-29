@@ -6,6 +6,7 @@ import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -53,6 +54,8 @@ import com.easylogger.app.data.local.entity.Category
 import com.easylogger.app.data.local.entity.CategoryWithLastLog
 import com.easylogger.app.data.local.entity.Folder
 import com.easylogger.app.data.local.entity.FolderWithCount
+import com.easylogger.app.data.local.entity.Question
+import com.easylogger.app.data.local.entity.QuestionWithLastAnswer
 import com.easylogger.app.data.repository.UserPreferenceRepository
 import com.easylogger.app.ui.components.EmptyState
 import sh.calvin.reorderable.ReorderableItem
@@ -63,21 +66,28 @@ import sh.calvin.reorderable.rememberReorderableLazyListState
 @Composable
 fun MainScreen(
     onCategoryClick: (Long) -> Unit,
+    onQuestionClick: (Long) -> Unit,
     activity: MainActivity,
     viewModel: CategoryListViewModel = hiltViewModel()
 ) {
     val state by viewModel.state.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
     var showAddCategoryDialog by remember { mutableStateOf(false) }
+    var showAddQuestionDialog by remember { mutableStateOf(false) }
     var showAddFolderDialog by remember { mutableStateOf(false) }
+    var showFabMenu by remember { mutableStateOf(false) }
     var editingCategory by remember { mutableStateOf<CategoryWithLastLog?>(null) }
     var deletingCategory by remember { mutableStateOf<CategoryWithLastLog?>(null) }
     var editingFolder by remember { mutableStateOf<FolderWithCount?>(null) }
     var deletingFolder by remember { mutableStateOf<FolderWithCount?>(null) }
+    var editingQuestion by remember { mutableStateOf<QuestionWithLastAnswer?>(null) }
+    var deletingQuestion by remember { mutableStateOf<QuestionWithLastAnswer?>(null) }
     var showOverflowMenu by remember { mutableStateOf(false) }
 
     val exportEmptyMsg = stringResource(R.string.export_empty)
     val exportSuccessMsg = stringResource(R.string.export_success)
+    val answerExportEmptyMsg = stringResource(R.string.answer_export_empty)
+    val answerExportSuccessMsg = stringResource(R.string.answer_export_success)
 
     // Handle back press when inside a folder
     if (state.isInsideFolder) {
@@ -93,6 +103,12 @@ fun MainScreen(
                 is MainScreenEvent.ExportEmpty -> {
                     snackbarHostState.showSnackbar(exportEmptyMsg)
                 }
+                is MainScreenEvent.AnswerExportReady -> {
+                    activity.createAnswerDocumentLauncher.launch(event.suggestedFilename)
+                }
+                is MainScreenEvent.AnswerExportEmpty -> {
+                    snackbarHostState.showSnackbar(answerExportEmptyMsg)
+                }
             }
         }
     }
@@ -102,6 +118,16 @@ fun MainScreen(
             result.onSuccess { (count, filename) ->
                 snackbarHostState.showSnackbar(
                     exportSuccessMsg.format(count, filename)
+                )
+            }
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        activity.answerExportResult.collect { result ->
+            result.onSuccess { (count, filename) ->
+                snackbarHostState.showSnackbar(
+                    answerExportSuccessMsg.format(count, filename)
                 )
             }
         }
@@ -170,14 +196,42 @@ fun MainScreen(
                                     viewModel.requestExport()
                                 }
                             )
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.export_answers_csv)) },
+                                onClick = {
+                                    showOverflowMenu = false
+                                    viewModel.requestAnswerExport()
+                                }
+                            )
                         }
                     }
                 }
             )
         },
         floatingActionButton = {
-            FloatingActionButton(onClick = { showAddCategoryDialog = true }) {
-                Icon(Icons.Default.Add, contentDescription = stringResource(R.string.add_category))
+            Box {
+                FloatingActionButton(onClick = { showFabMenu = true }) {
+                    Icon(Icons.Default.Add, contentDescription = stringResource(R.string.add_item))
+                }
+                DropdownMenu(
+                    expanded = showFabMenu,
+                    onDismissRequest = { showFabMenu = false }
+                ) {
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.add_category)) },
+                        onClick = {
+                            showFabMenu = false
+                            showAddCategoryDialog = true
+                        }
+                    )
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.add_question)) },
+                        onClick = {
+                            showFabMenu = false
+                            showAddQuestionDialog = true
+                        }
+                    )
+                }
             }
         }
     ) { padding ->
@@ -194,7 +248,7 @@ fun MainScreen(
             } else if (isInsideFolder && state.folderItems.isEmpty() && !state.isLoading) {
                 EmptyState(message = stringResource(R.string.empty_folder_message))
             } else if (isInsideFolder) {
-                // Inside a folder — show mixed sub-folders + categories
+                // Inside a folder — show mixed sub-folders + categories + questions
                 if (isListMode) {
                     FolderContentList(
                         items = state.folderItems,
@@ -207,6 +261,10 @@ fun MainScreen(
                         onEditFolder = { editingFolder = it },
                         onDeleteFolder = { deletingFolder = it },
                         onRemoveFolderFromParent = { viewModel.removeFolderFromParent(it.id) },
+                        onQuestionClick = onQuestionClick,
+                        onEditQuestion = { editingQuestion = it },
+                        onDeleteQuestion = { deletingQuestion = it },
+                        onRemoveQuestionFromFolder = { viewModel.removeQuestionFromFolder(it.id) },
                         onReorder = viewModel::onReorder,
                         onReorderConfirmed = viewModel::onReorderConfirmed
                     )
@@ -222,12 +280,16 @@ fun MainScreen(
                         onEditFolder = { editingFolder = it },
                         onDeleteFolder = { deletingFolder = it },
                         onRemoveFolderFromParent = { viewModel.removeFolderFromParent(it.id) },
+                        onQuestionClick = onQuestionClick,
+                        onEditQuestion = { editingQuestion = it },
+                        onDeleteQuestion = { deletingQuestion = it },
+                        onRemoveQuestionFromFolder = { viewModel.removeQuestionFromFolder(it.id) },
                         onReorder = viewModel::onReorder,
                         onReorderConfirmed = viewModel::onReorderConfirmed
                     )
                 }
             } else {
-                // Top level — mixed folders + categories
+                // Top level — mixed folders + categories + questions
                 if (isListMode) {
                     TopLevelList(
                         items = state.topLevelItems,
@@ -238,6 +300,9 @@ fun MainScreen(
                         onFolderClick = { viewModel.enterFolder(it.id, it.name) },
                         onEditFolder = { editingFolder = it },
                         onDeleteFolder = { deletingFolder = it },
+                        onQuestionClick = onQuestionClick,
+                        onEditQuestion = { editingQuestion = it },
+                        onDeleteQuestion = { deletingQuestion = it },
                         onReorder = viewModel::onReorder,
                         onReorderConfirmed = viewModel::onReorderConfirmed
                     )
@@ -251,6 +316,9 @@ fun MainScreen(
                         onFolderClick = { viewModel.enterFolder(it.id, it.name) },
                         onEditFolder = { editingFolder = it },
                         onDeleteFolder = { deletingFolder = it },
+                        onQuestionClick = onQuestionClick,
+                        onEditQuestion = { editingQuestion = it },
+                        onDeleteQuestion = { deletingQuestion = it },
                         onReorder = viewModel::onReorder,
                         onReorderConfirmed = viewModel::onReorderConfirmed
                     )
@@ -267,6 +335,16 @@ fun MainScreen(
             onSave = { name ->
                 viewModel.addCategory(name)
                 showAddCategoryDialog = false
+            }
+        )
+    }
+
+    if (showAddQuestionDialog) {
+        AddEditQuestionDialog(
+            onDismiss = { showAddQuestionDialog = false },
+            onSave = { name, answerType, textOptions, scaleMin, scaleMax ->
+                viewModel.addQuestion(name, answerType, textOptions, scaleMin, scaleMax)
+                showAddQuestionDialog = false
             }
         )
     }
@@ -321,6 +399,34 @@ fun MainScreen(
         )
     }
 
+    editingQuestion?.let { question ->
+        AddEditQuestionDialog(
+            initialName = question.name,
+            initialAnswerType = question.answerType,
+            initialTextOptions = question.textOptions ?: "",
+            initialScaleMin = question.scaleMin,
+            initialScaleMax = question.scaleMax,
+            onDismiss = { editingQuestion = null },
+            onSave = { name, answerType, textOptions, scaleMin, scaleMax ->
+                viewModel.updateQuestion(
+                    Question(
+                        id = question.id,
+                        name = name,
+                        answerType = answerType,
+                        textOptions = textOptions,
+                        scaleMin = scaleMin,
+                        scaleMax = scaleMax,
+                        sortOrder = question.sortOrder,
+                        createdAt = question.createdAt,
+                        folderId = question.folderId,
+                        folderSortOrder = question.folderSortOrder
+                    )
+                )
+                editingQuestion = null
+            }
+        )
+    }
+
     deletingCategory?.let { category ->
         DeleteCategoryDialog(
             categoryName = category.name,
@@ -342,6 +448,17 @@ fun MainScreen(
             }
         )
     }
+
+    deletingQuestion?.let { question ->
+        DeleteCategoryDialog(
+            categoryName = question.name,
+            onDismiss = { deletingQuestion = null },
+            onConfirm = {
+                viewModel.deleteQuestion(question)
+                deletingQuestion = null
+            }
+        )
+    }
 }
 
 // --- Top-level list composable ---
@@ -356,6 +473,9 @@ private fun TopLevelList(
     onFolderClick: (FolderWithCount) -> Unit,
     onEditFolder: (FolderWithCount) -> Unit,
     onDeleteFolder: (FolderWithCount) -> Unit,
+    onQuestionClick: (Long) -> Unit,
+    onEditQuestion: (QuestionWithLastAnswer) -> Unit,
+    onDeleteQuestion: (QuestionWithLastAnswer) -> Unit,
     onReorder: (Int, Int) -> Unit,
     onReorderConfirmed: () -> Unit
 ) {
@@ -408,6 +528,19 @@ private fun TopLevelList(
                                         Modifier
                                     }
                                 )
+                                .longPressDraggableHandle(
+                                    onDragStopped = { onReorderConfirmed() }
+                                )
+                        )
+                    }
+                    is MainListItem.QuestionItem -> {
+                        QuestionListItem(
+                            question = item.data,
+                            onClick = { onQuestionClick(item.data.id) },
+                            onEdit = { onEditQuestion(item.data) },
+                            onDelete = { onDeleteQuestion(item.data) },
+                            modifier = Modifier
+                                .shadow(elevation)
                                 .longPressDraggableHandle(
                                     onDragStopped = { onReorderConfirmed() }
                                 )
@@ -431,6 +564,9 @@ private fun TopLevelGrid(
     onFolderClick: (FolderWithCount) -> Unit,
     onEditFolder: (FolderWithCount) -> Unit,
     onDeleteFolder: (FolderWithCount) -> Unit,
+    onQuestionClick: (Long) -> Unit,
+    onEditQuestion: (QuestionWithLastAnswer) -> Unit,
+    onDeleteQuestion: (QuestionWithLastAnswer) -> Unit,
     onReorder: (Int, Int) -> Unit,
     onReorderConfirmed: () -> Unit
 ) {
@@ -480,13 +616,26 @@ private fun TopLevelGrid(
                                 )
                         )
                     }
+                    is MainListItem.QuestionItem -> {
+                        QuestionGridCard(
+                            question = item.data,
+                            onClick = { onQuestionClick(item.data.id) },
+                            onEdit = { onEditQuestion(item.data) },
+                            onDelete = { onDeleteQuestion(item.data) },
+                            modifier = Modifier
+                                .shadow(elevation, shape = MaterialTheme.shapes.medium)
+                                .longPressDraggableHandle(
+                                    onDragStopped = { onReorderConfirmed() }
+                                )
+                        )
+                    }
                 }
             }
         }
     }
 }
 
-// --- Folder-interior list composable (mixed sub-folders + categories) ---
+// --- Folder-interior list composable (mixed sub-folders + categories + questions) ---
 
 @Composable
 private fun FolderContentList(
@@ -500,6 +649,10 @@ private fun FolderContentList(
     onEditFolder: (FolderWithCount) -> Unit,
     onDeleteFolder: (FolderWithCount) -> Unit,
     onRemoveFolderFromParent: (FolderWithCount) -> Unit,
+    onQuestionClick: (Long) -> Unit,
+    onEditQuestion: (QuestionWithLastAnswer) -> Unit,
+    onDeleteQuestion: (QuestionWithLastAnswer) -> Unit,
+    onRemoveQuestionFromFolder: (QuestionWithLastAnswer) -> Unit,
     onReorder: (Int, Int) -> Unit,
     onReorderConfirmed: () -> Unit
 ) {
@@ -559,13 +712,27 @@ private fun FolderContentList(
                                 )
                         )
                     }
+                    is MainListItem.QuestionItem -> {
+                        QuestionListItem(
+                            question = item.data,
+                            onClick = { onQuestionClick(item.data.id) },
+                            onEdit = { onEditQuestion(item.data) },
+                            onDelete = { onDeleteQuestion(item.data) },
+                            onRemoveFromFolder = { onRemoveQuestionFromFolder(item.data) },
+                            modifier = Modifier
+                                .shadow(elevation)
+                                .longPressDraggableHandle(
+                                    onDragStopped = { onReorderConfirmed() }
+                                )
+                        )
+                    }
                 }
             }
         }
     }
 }
 
-// --- Folder-interior grid composable (mixed sub-folders + categories) ---
+// --- Folder-interior grid composable (mixed sub-folders + categories + questions) ---
 
 @Composable
 private fun FolderContentGrid(
@@ -579,6 +746,10 @@ private fun FolderContentGrid(
     onEditFolder: (FolderWithCount) -> Unit,
     onDeleteFolder: (FolderWithCount) -> Unit,
     onRemoveFolderFromParent: (FolderWithCount) -> Unit,
+    onQuestionClick: (Long) -> Unit,
+    onEditQuestion: (QuestionWithLastAnswer) -> Unit,
+    onDeleteQuestion: (QuestionWithLastAnswer) -> Unit,
+    onRemoveQuestionFromFolder: (QuestionWithLastAnswer) -> Unit,
     onReorder: (Int, Int) -> Unit,
     onReorderConfirmed: () -> Unit
 ) {
@@ -623,6 +794,20 @@ private fun FolderContentGrid(
                             onEdit = { onEditFolder(item.data) },
                             onDelete = { onDeleteFolder(item.data) },
                             onRemoveFromFolder = { onRemoveFolderFromParent(item.data) },
+                            modifier = Modifier
+                                .shadow(elevation, shape = MaterialTheme.shapes.medium)
+                                .longPressDraggableHandle(
+                                    onDragStopped = { onReorderConfirmed() }
+                                )
+                        )
+                    }
+                    is MainListItem.QuestionItem -> {
+                        QuestionGridCard(
+                            question = item.data,
+                            onClick = { onQuestionClick(item.data.id) },
+                            onEdit = { onEditQuestion(item.data) },
+                            onDelete = { onDeleteQuestion(item.data) },
+                            onRemoveFromFolder = { onRemoveQuestionFromFolder(item.data) },
                             modifier = Modifier
                                 .shadow(elevation, shape = MaterialTheme.shapes.medium)
                                 .longPressDraggableHandle(

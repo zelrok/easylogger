@@ -1,7 +1,9 @@
 package com.easylogger.app.export
 
+import com.easylogger.app.data.local.dao.AnswerDao
 import com.easylogger.app.data.local.dao.CategoryDao
 import com.easylogger.app.data.local.dao.LogEntryDao
+import com.easylogger.app.data.local.dao.QuestionDao
 import java.io.OutputStream
 import java.io.OutputStreamWriter
 import java.text.SimpleDateFormat
@@ -13,7 +15,9 @@ import javax.inject.Singleton
 @Singleton
 class CsvExporter @Inject constructor(
     private val logEntryDao: LogEntryDao,
-    private val categoryDao: CategoryDao
+    private val categoryDao: CategoryDao,
+    private val answerDao: AnswerDao,
+    private val questionDao: QuestionDao
 ) {
     suspend fun export(outputStream: OutputStream): Int {
         val entries = logEntryDao.getAll()
@@ -42,6 +46,32 @@ class CsvExporter @Inject constructor(
         }
 
         return entries.size
+    }
+
+    suspend fun exportAnswers(outputStream: OutputStream): Int {
+        val answers = answerDao.getAll()
+        val questions = questionDao.getAllList()
+
+        val questionMap = questions.associate { it.id to it.name }
+        val isoFormat = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.US)
+
+        val sorted = answers.sortedWith(
+            compareBy<com.easylogger.app.data.local.entity.Answer> { questionMap[it.questionId] ?: "" }
+                .thenBy { it.createdAt }
+        )
+
+        OutputStreamWriter(outputStream, Charsets.UTF_8).use { writer ->
+            outputStream.write(byteArrayOf(0xEF.toByte(), 0xBB.toByte(), 0xBF.toByte()))
+
+            writer.write("question,answer,answered_at\n")
+            for (answer in sorted) {
+                val questionName = questionMap[answer.questionId] ?: "Unknown"
+                val answeredAt = isoFormat.format(Date(answer.createdAt))
+                writer.write("${escapeCsv(questionName)},${escapeCsv(answer.value)},${answeredAt}\n")
+            }
+        }
+
+        return answers.size
     }
 
     private fun escapeCsv(value: String): String {

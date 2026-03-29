@@ -23,6 +23,9 @@ fun AppNavHost(activity: MainActivity) {
                 onCategoryClick = { categoryId ->
                     navController.navigate(NavRoutes.Detail.createRoute(categoryId))
                 },
+                onQuestionClick = { questionId ->
+                    navController.navigate(NavRoutes.QuestionDetail.createRoute(questionId))
+                },
                 activity = activity
             )
         }
