@@ -63,7 +63,7 @@ Android's `versionCode` is an independent integer that increments by 1 with ever
 
 ## Project Status
 
-All features from the spec are implemented. The app is production-ready at v1.3.0 (versionCode 4).
+All features from the spec are implemented. The app is production-ready at v1.4.0 (versionCode 5).
 
 **Known UI polish gaps** (minor, not blocking):
 
@@ -79,10 +79,9 @@ All features from the spec are implemented. The app is production-ready at v1.3.
 
 ## Changelog
 
-### WIP — feature/nested-folders (branch, not yet merged)
+### v1.4.0 (2026-03-29) — versionCode 5
 
 - **Nested folders:** Folders can now contain sub-folders. Folder entity gains `parentFolderId` (self-referential FK, SET_NULL) and `folderSortOrder`. ViewModel navigation uses a folder stack for arbitrary nesting depth. Folder interior shows mixed sub-folders + categories. "Add Folder" button available at all nesting levels. Drag-drop supports folder-onto-folder. FolderListItem/FolderGridCard gain "Remove from Folder" option. Room migration v3→v4. 13 new unit tests.
-- **Remaining work:** QA testing on device, version bump, merge to main.
 
 ### v1.3.0 (2026-03-28) — versionCode 4
 
