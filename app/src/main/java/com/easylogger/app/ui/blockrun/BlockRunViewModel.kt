@@ -15,6 +15,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.receiveAsFlow
@@ -124,14 +125,10 @@ class BlockRunViewModel @Inject constructor(
         viewModelScope.launch {
             // Auto-close any open entry first
             if (openLogEntryId != null) {
-                val now = System.currentTimeMillis()
-                val entry = com.easylogger.app.data.local.entity.LogEntry(
-                    id = openLogEntryId!!,
-                    categoryId = current.category.id,
-                    startTime = now,
-                    endTime = now
-                )
-                logEntryRepository.stopEntry(entry, now)
+                val open = logEntryRepository.getOpenEntry(current.category.id).first()
+                if (open != null) {
+                    logEntryRepository.stopEntry(open, System.currentTimeMillis())
+                }
                 openLogEntryId = null
             }
             val now = System.currentTimeMillis()
@@ -167,15 +164,10 @@ class BlockRunViewModel @Inject constructor(
         if (current !is BlockItem.CategoryBlockItem) return
         if (!_state.value.hasOpenLogEntry) return
         viewModelScope.launch {
-            val entryId = openLogEntryId ?: return@launch
+            val open = logEntryRepository.getOpenEntry(current.category.id).first()
+                ?: return@launch
             val now = System.currentTimeMillis()
-            val entry = com.easylogger.app.data.local.entity.LogEntry(
-                id = entryId,
-                categoryId = current.category.id,
-                startTime = now, // Will be overwritten by stopEntry via update
-                endTime = now
-            )
-            logEntryRepository.stopEntry(entry, now)
+            logEntryRepository.stopEntry(open, now)
             openLogEntryId = null
             _state.value = _state.value.copy(hasOpenLogEntry = false)
             advanceToNext()
