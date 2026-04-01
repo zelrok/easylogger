@@ -38,13 +38,16 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import kotlinx.coroutines.delay
 import com.easylogger.app.R
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
@@ -181,7 +184,8 @@ private fun ShowingItemContent(
                 totalSeconds = state.totalSeconds,
                 timerState = state.timerState,
                 onPause = onPause,
-                onResume = onResume
+                onResume = onResume,
+                showControls = !state.hasOpenLogEntry
             )
             Spacer(modifier = Modifier.height(32.dp))
         }
@@ -192,9 +196,14 @@ private fun ShowingItemContent(
         when (item) {
             is BlockItem.CategoryBlockItem -> CategoryActions(
                 hasOpenEntry = state.hasOpenLogEntry,
+                logStartTimeMillis = state.logStartTimeMillis,
+                totalPausedMillis = state.totalPausedMillis,
+                timerState = state.timerState,
                 onLogNow = onLogNow,
                 onLogStart = onLogStart,
-                onLogStop = onLogStop
+                onLogStop = onLogStop,
+                onPause = onPause,
+                onResume = onResume
             )
 
             is BlockItem.QuestionBlockItem -> QuestionActions(
@@ -211,7 +220,8 @@ private fun TimerDisplay(
     totalSeconds: Int,
     timerState: TimerState,
     onPause: () -> Unit,
-    onResume: () -> Unit
+    onResume: () -> Unit,
+    showControls: Boolean = true
 ) {
     val progress by animateFloatAsState(
         targetValue = if (totalSeconds > 0) remainingSeconds.toFloat() / totalSeconds else 0f,
@@ -234,6 +244,8 @@ private fun TimerDisplay(
                 .fillMaxWidth()
                 .height(8.dp)
         )
+
+        if (!showControls) return@Column
 
         Spacer(modifier = Modifier.height(12.dp))
 
@@ -264,43 +276,114 @@ private fun TimerDisplay(
 @Composable
 private fun CategoryActions(
     hasOpenEntry: Boolean,
+    logStartTimeMillis: Long,
+    totalPausedMillis: Long,
+    timerState: TimerState,
     onLogNow: () -> Unit,
     onLogStart: () -> Unit,
-    onLogStop: () -> Unit
+    onLogStop: () -> Unit,
+    onPause: () -> Unit,
+    onResume: () -> Unit
 ) {
     Column(
         modifier = Modifier.fillMaxWidth(),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        Button(
-            onClick = onLogNow,
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Text(stringResource(R.string.log_now))
-        }
+        if (!hasOpenEntry) {
+            Button(
+                onClick = onLogNow,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(stringResource(R.string.log_now))
+            }
 
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            if (!hasOpenEntry) {
-                OutlinedButton(
-                    onClick = onLogStart,
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Text(stringResource(R.string.log_start))
+            OutlinedButton(
+                onClick = onLogStart,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(stringResource(R.string.log_start))
+            }
+        } else {
+            // Elapsed timer counting up from log start
+            ElapsedTimer(
+                startTimeMillis = logStartTimeMillis,
+                totalPausedMillis = totalPausedMillis,
+                isPaused = timerState == TimerState.PAUSED
+            )
+
+            // Pause/resume countdown timer (if timed)
+            when (timerState) {
+                TimerState.RUNNING -> {
+                    OutlinedButton(
+                        onClick = onPause,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(
+                            Icons.Filled.Pause,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(stringResource(R.string.pause))
+                    }
                 }
-            } else {
-                FilledTonalButton(
-                    onClick = onLogStop,
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Text(stringResource(R.string.log_stop))
+                TimerState.PAUSED -> {
+                    OutlinedButton(
+                        onClick = onResume,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(
+                            Icons.Filled.PlayArrow,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(stringResource(R.string.resume))
+                    }
                 }
+                TimerState.IDLE -> { /* no countdown to control */ }
+            }
+
+            FilledTonalButton(
+                onClick = onLogStop,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(stringResource(R.string.log_stop))
             }
         }
     }
+}
+
+@Composable
+private fun ElapsedTimer(
+    startTimeMillis: Long,
+    totalPausedMillis: Long,
+    isPaused: Boolean
+) {
+    var elapsedSeconds by remember { mutableLongStateOf(0L) }
+
+    LaunchedEffect(startTimeMillis, isPaused, totalPausedMillis) {
+        if (startTimeMillis <= 0L) return@LaunchedEffect
+        if (isPaused) {
+            // Freeze at current elapsed value
+            elapsedSeconds = (System.currentTimeMillis() - startTimeMillis - totalPausedMillis) / 1000
+            return@LaunchedEffect
+        }
+        while (true) {
+            elapsedSeconds = (System.currentTimeMillis() - startTimeMillis - totalPausedMillis) / 1000
+            delay(1000)
+        }
+    }
+
+    val minutes = elapsedSeconds / 60
+    val seconds = elapsedSeconds % 60
+
+    Text(
+        text = "%d:%02d".format(minutes, seconds),
+        style = MaterialTheme.typography.headlineMedium,
+        color = MaterialTheme.colorScheme.primary
+    )
 }
 
 @OptIn(ExperimentalLayoutApi::class)

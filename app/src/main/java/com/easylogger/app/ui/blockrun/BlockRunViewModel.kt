@@ -55,6 +55,9 @@ data class BlockRunUiState(
     val autoNextEnabled: Boolean = false,
     val restDurationSeconds: Int? = null,
     val hasOpenLogEntry: Boolean = false,
+    val logStartTimeMillis: Long = 0L,
+    val pausedAtMillis: Long = 0L,
+    val totalPausedMillis: Long = 0L,
     val isLoading: Boolean = true
 ) {
     val currentItem: BlockItem? get() = items.getOrNull(currentIndex)
@@ -155,7 +158,7 @@ class BlockRunViewModel @Inject constructor(
         viewModelScope.launch {
             val now = System.currentTimeMillis()
             openLogEntryId = logEntryRepository.insertStart(current.category.id, now)
-            _state.value = _state.value.copy(hasOpenLogEntry = true)
+            _state.value = _state.value.copy(hasOpenLogEntry = true, logStartTimeMillis = now)
         }
     }
 
@@ -178,11 +181,20 @@ class BlockRunViewModel @Inject constructor(
         if (_state.value.timerState != TimerState.RUNNING) return
         timerJob?.cancel()
         timerJob = null
-        _state.value = _state.value.copy(timerState = TimerState.PAUSED)
+        _state.value = _state.value.copy(
+            timerState = TimerState.PAUSED,
+            pausedAtMillis = System.currentTimeMillis()
+        )
     }
 
     fun resumeTimer() {
         if (_state.value.timerState != TimerState.PAUSED) return
+        val s = _state.value
+        val pauseDuration = if (s.pausedAtMillis > 0) System.currentTimeMillis() - s.pausedAtMillis else 0L
+        _state.value = s.copy(
+            totalPausedMillis = s.totalPausedMillis + pauseDuration,
+            pausedAtMillis = 0L
+        )
         startCountdown(_state.value.remainingSeconds)
     }
 
@@ -199,6 +211,9 @@ class BlockRunViewModel @Inject constructor(
         _state.value = s.copy(
             phase = BlockRunPhase.SHOWING_ITEM,
             hasOpenLogEntry = false,
+            logStartTimeMillis = 0L,
+            pausedAtMillis = 0L,
+            totalPausedMillis = 0L,
             timerState = TimerState.IDLE,
             remainingSeconds = 0,
             totalSeconds = 0
