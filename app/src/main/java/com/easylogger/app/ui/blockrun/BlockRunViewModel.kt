@@ -56,6 +56,7 @@ data class BlockRunUiState(
     val restDurationSeconds: Int? = null,
     val hasOpenLogEntry: Boolean = false,
     val logStartTimeMillis: Long = 0L,
+    val elapsedPaused: Boolean = false,
     val pausedAtMillis: Long = 0L,
     val totalPausedMillis: Long = 0L,
     val isLoading: Boolean = true
@@ -198,6 +199,43 @@ class BlockRunViewModel @Inject constructor(
         startCountdown(_state.value.remainingSeconds)
     }
 
+    fun pauseAll() {
+        val s = _state.value
+        if (!s.hasOpenLogEntry) return
+        val now = System.currentTimeMillis()
+        // Pause countdown if running
+        if (s.timerState == TimerState.RUNNING) {
+            timerJob?.cancel()
+            timerJob = null
+            _state.value = _state.value.copy(
+                timerState = TimerState.PAUSED,
+                elapsedPaused = true,
+                pausedAtMillis = now
+            )
+        } else {
+            // Countdown already finished — just pause the elapsed timer
+            _state.value = _state.value.copy(
+                elapsedPaused = true,
+                pausedAtMillis = now
+            )
+        }
+    }
+
+    fun resumeAll() {
+        val s = _state.value
+        if (!s.elapsedPaused) return
+        val pauseDuration = if (s.pausedAtMillis > 0) System.currentTimeMillis() - s.pausedAtMillis else 0L
+        _state.value = s.copy(
+            elapsedPaused = false,
+            totalPausedMillis = s.totalPausedMillis + pauseDuration,
+            pausedAtMillis = 0L
+        )
+        // Resume countdown if it was paused
+        if (_state.value.timerState == TimerState.PAUSED) {
+            startCountdown(_state.value.remainingSeconds)
+        }
+    }
+
     fun skipRest() {
         if (_state.value.phase != BlockRunPhase.SHOWING_REST) return
         cancelTimer()
@@ -212,6 +250,7 @@ class BlockRunViewModel @Inject constructor(
             phase = BlockRunPhase.SHOWING_ITEM,
             hasOpenLogEntry = false,
             logStartTimeMillis = 0L,
+            elapsedPaused = false,
             pausedAtMillis = 0L,
             totalPausedMillis = 0L,
             timerState = TimerState.IDLE,

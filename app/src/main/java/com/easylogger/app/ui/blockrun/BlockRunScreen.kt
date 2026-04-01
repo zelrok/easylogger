@@ -123,6 +123,8 @@ fun BlockRunScreen(
                 onSubmitAnswer = viewModel::submitAnswer,
                 onPause = viewModel::pauseTimer,
                 onResume = viewModel::resumeTimer,
+                onPauseAll = viewModel::pauseAll,
+                onResumeAll = viewModel::resumeAll,
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(padding)
@@ -159,6 +161,8 @@ private fun ShowingItemContent(
     onSubmitAnswer: (String) -> Unit,
     onPause: () -> Unit,
     onResume: () -> Unit,
+    onPauseAll: () -> Unit,
+    onResumeAll: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val item = state.currentItem ?: return
@@ -198,12 +202,12 @@ private fun ShowingItemContent(
                 hasOpenEntry = state.hasOpenLogEntry,
                 logStartTimeMillis = state.logStartTimeMillis,
                 totalPausedMillis = state.totalPausedMillis,
-                timerState = state.timerState,
+                elapsedPaused = state.elapsedPaused,
                 onLogNow = onLogNow,
                 onLogStart = onLogStart,
                 onLogStop = onLogStop,
-                onPause = onPause,
-                onResume = onResume
+                onPauseAll = onPauseAll,
+                onResumeAll = onResumeAll
             )
 
             is BlockItem.QuestionBlockItem -> QuestionActions(
@@ -278,12 +282,12 @@ private fun CategoryActions(
     hasOpenEntry: Boolean,
     logStartTimeMillis: Long,
     totalPausedMillis: Long,
-    timerState: TimerState,
+    elapsedPaused: Boolean,
     onLogNow: () -> Unit,
     onLogStart: () -> Unit,
     onLogStop: () -> Unit,
-    onPause: () -> Unit,
-    onResume: () -> Unit
+    onPauseAll: () -> Unit,
+    onResumeAll: () -> Unit
 ) {
     Column(
         modifier = Modifier.fillMaxWidth(),
@@ -309,40 +313,36 @@ private fun CategoryActions(
             ElapsedTimer(
                 startTimeMillis = logStartTimeMillis,
                 totalPausedMillis = totalPausedMillis,
-                isPaused = timerState == TimerState.PAUSED
+                isPaused = elapsedPaused
             )
 
-            // Pause/resume countdown timer (if timed)
-            when (timerState) {
-                TimerState.RUNNING -> {
-                    OutlinedButton(
-                        onClick = onPause,
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Icon(
-                            Icons.Filled.Pause,
-                            contentDescription = null,
-                            modifier = Modifier.size(18.dp)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(stringResource(R.string.pause))
-                    }
+            // Pause/resume both countdown and elapsed timers
+            if (!elapsedPaused) {
+                OutlinedButton(
+                    onClick = onPauseAll,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(
+                        Icons.Filled.Pause,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(stringResource(R.string.pause))
                 }
-                TimerState.PAUSED -> {
-                    OutlinedButton(
-                        onClick = onResume,
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Icon(
-                            Icons.Filled.PlayArrow,
-                            contentDescription = null,
-                            modifier = Modifier.size(18.dp)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(stringResource(R.string.resume))
-                    }
+            } else {
+                OutlinedButton(
+                    onClick = onResumeAll,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(
+                        Icons.Filled.PlayArrow,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(stringResource(R.string.resume))
                 }
-                TimerState.IDLE -> { /* no countdown to control */ }
             }
 
             FilledTonalButton(
