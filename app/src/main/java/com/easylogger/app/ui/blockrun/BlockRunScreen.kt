@@ -10,12 +10,15 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Pause
@@ -289,6 +292,11 @@ private fun CategoryActions(
     onPauseAll: () -> Unit,
     onResumeAll: () -> Unit
 ) {
+    val buttonShape = RoundedCornerShape(8.dp)
+    val buttonModifier = Modifier
+        .fillMaxWidth()
+        .heightIn(min = 72.dp)
+
     Column(
         modifier = Modifier.fillMaxWidth(),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -297,16 +305,18 @@ private fun CategoryActions(
         if (!hasOpenEntry) {
             Button(
                 onClick = onLogNow,
-                modifier = Modifier.fillMaxWidth()
+                shape = buttonShape,
+                modifier = buttonModifier
             ) {
-                Text(stringResource(R.string.log_now))
+                Text(stringResource(R.string.log_now), style = MaterialTheme.typography.titleLarge)
             }
 
             OutlinedButton(
                 onClick = onLogStart,
-                modifier = Modifier.fillMaxWidth()
+                shape = buttonShape,
+                modifier = buttonModifier
             ) {
-                Text(stringResource(R.string.log_start))
+                Text(stringResource(R.string.log_start), style = MaterialTheme.typography.titleLarge)
             }
         } else {
             // Elapsed timer counting up from log start
@@ -320,36 +330,39 @@ private fun CategoryActions(
             if (!elapsedPaused) {
                 OutlinedButton(
                     onClick = onPauseAll,
-                    modifier = Modifier.fillMaxWidth()
+                    shape = buttonShape,
+                    modifier = buttonModifier
                 ) {
                     Icon(
                         Icons.Filled.Pause,
                         contentDescription = null,
-                        modifier = Modifier.size(18.dp)
+                        modifier = Modifier.size(24.dp)
                     )
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text(stringResource(R.string.pause))
+                    Text(stringResource(R.string.pause), style = MaterialTheme.typography.titleLarge)
                 }
             } else {
                 OutlinedButton(
                     onClick = onResumeAll,
-                    modifier = Modifier.fillMaxWidth()
+                    shape = buttonShape,
+                    modifier = buttonModifier
                 ) {
                     Icon(
                         Icons.Filled.PlayArrow,
                         contentDescription = null,
-                        modifier = Modifier.size(18.dp)
+                        modifier = Modifier.size(24.dp)
                     )
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text(stringResource(R.string.resume))
+                    Text(stringResource(R.string.resume), style = MaterialTheme.typography.titleLarge)
                 }
             }
 
             FilledTonalButton(
                 onClick = onLogStop,
-                modifier = Modifier.fillMaxWidth()
+                shape = buttonShape,
+                modifier = buttonModifier
             ) {
-                Text(stringResource(R.string.log_stop))
+                Text(stringResource(R.string.log_stop), style = MaterialTheme.typography.titleLarge)
             }
         }
     }
@@ -392,6 +405,8 @@ private fun QuestionActions(
     question: com.easylogger.app.data.local.entity.Question,
     onSubmitAnswer: (String) -> Unit
 ) {
+    val buttonShape = RoundedCornerShape(8.dp)
+
     if (question.answerType == "TEXT" && question.textOptions != null) {
         FlowRow(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -400,8 +415,12 @@ private fun QuestionActions(
         ) {
             question.textOptions.split(",").map { it.trim() }.filter { it.isNotEmpty() }
                 .forEach { option ->
-                    Button(onClick = { onSubmitAnswer(option) }) {
-                        Text(option)
+                    Button(
+                        onClick = { onSubmitAnswer(option) },
+                        shape = buttonShape,
+                        modifier = Modifier.heightIn(min = 64.dp)
+                    ) {
+                        Text(option, style = MaterialTheme.typography.titleLarge)
                     }
                 }
         }
@@ -412,8 +431,13 @@ private fun QuestionActions(
             modifier = Modifier.fillMaxWidth()
         ) {
             for (i in question.scaleMin..question.scaleMax) {
-                OutlinedButton(onClick = { onSubmitAnswer(i.toString()) }) {
-                    Text(i.toString())
+                OutlinedButton(
+                    onClick = { onSubmitAnswer(i.toString()) },
+                    shape = buttonShape,
+                    modifier = Modifier
+                        .size(72.dp)
+                ) {
+                    Text(i.toString(), style = MaterialTheme.typography.titleLarge)
                 }
             }
         }
@@ -452,14 +476,20 @@ private fun ShowingRestContent(
 
         Spacer(modifier = Modifier.height(32.dp))
 
-        OutlinedButton(onClick = onSkip) {
+        OutlinedButton(
+            onClick = onSkip,
+            shape = RoundedCornerShape(8.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = 72.dp)
+        ) {
             Icon(
                 Icons.Filled.SkipNext,
                 contentDescription = null,
-                modifier = Modifier.size(18.dp)
+                modifier = Modifier.size(24.dp)
             )
-            Spacer(modifier = Modifier.width(4.dp))
-            Text(stringResource(R.string.skip))
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(stringResource(R.string.skip), style = MaterialTheme.typography.titleLarge)
         }
     }
 }
@@ -490,8 +520,14 @@ private fun CompletedContent(
 
         Spacer(modifier = Modifier.height(32.dp))
 
-        Button(onClick = onDone) {
-            Text(stringResource(R.string.done))
+        Button(
+            onClick = onDone,
+            shape = RoundedCornerShape(8.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = 72.dp)
+        ) {
+            Text(stringResource(R.string.done), style = MaterialTheme.typography.titleLarge)
         }
     }
 }
