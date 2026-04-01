@@ -19,13 +19,17 @@ class QuestionRepository @Inject constructor(
 
     suspend fun getById(id: Long): Question? = questionDao.getById(id)
 
+    suspend fun getQuestionsInFolderOrdered(folderId: Long): List<Question> =
+        questionDao.getQuestionsInFolderOrdered(folderId)
+
     suspend fun insert(
         name: String,
         answerType: String,
         textOptions: String? = null,
         scaleMin: Int = 1,
         scaleMax: Int = 5,
-        folderId: Long? = null
+        folderId: Long? = null,
+        desiredDurationSeconds: Int? = null
     ): Long {
         val question = if (folderId != null) {
             val nextFolderOrder = questionDao.getNextFolderSortOrder(folderId)
@@ -38,7 +42,8 @@ class QuestionRepository @Inject constructor(
                 sortOrder = 0,
                 createdAt = System.currentTimeMillis(),
                 folderId = folderId,
-                folderSortOrder = nextFolderOrder
+                folderSortOrder = nextFolderOrder,
+                desiredDurationSeconds = desiredDurationSeconds
             )
         } else {
             val nextOrder = questionDao.getNextSortOrder()
@@ -49,7 +54,8 @@ class QuestionRepository @Inject constructor(
                 scaleMin = scaleMin,
                 scaleMax = scaleMax,
                 sortOrder = nextOrder,
-                createdAt = System.currentTimeMillis()
+                createdAt = System.currentTimeMillis(),
+                desiredDurationSeconds = desiredDurationSeconds
             )
         }
         return questionDao.insert(question)

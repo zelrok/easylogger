@@ -17,7 +17,7 @@ import com.easylogger.app.data.local.entity.UserPreference
 
 @Database(
     entities = [Category::class, LogEntry::class, UserPreference::class, Folder::class, Question::class, Answer::class],
-    version = 5,
+    version = 6,
     exportSchema = true
 )
 abstract class AppDatabase : RoomDatabase() {

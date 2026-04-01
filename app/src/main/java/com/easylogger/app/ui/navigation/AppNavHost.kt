@@ -7,6 +7,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.easylogger.app.MainActivity
+import com.easylogger.app.ui.blockrun.BlockRunScreen
 import com.easylogger.app.ui.detail.DetailScreen
 import com.easylogger.app.ui.detail.QuestionDetailScreen
 import com.easylogger.app.ui.main.MainScreen
@@ -26,6 +27,9 @@ fun AppNavHost(activity: MainActivity) {
                 },
                 onQuestionClick = { questionId ->
                     navController.navigate(NavRoutes.QuestionDetail.createRoute(questionId))
+                },
+                onBlockRunClick = { folderId ->
+                    navController.navigate(NavRoutes.BlockRun.createRoute(folderId))
                 },
                 activity = activity
             )
@@ -47,6 +51,16 @@ fun AppNavHost(activity: MainActivity) {
             )
         ) {
             QuestionDetailScreen(
+                onNavigateBack = { navController.popBackStack() }
+            )
+        }
+        composable(
+            route = NavRoutes.BlockRun.route,
+            arguments = listOf(
+                navArgument("folderId") { type = NavType.LongType }
+            )
+        ) {
+            BlockRunScreen(
                 onNavigateBack = { navController.popBackStack() }
             )
         }

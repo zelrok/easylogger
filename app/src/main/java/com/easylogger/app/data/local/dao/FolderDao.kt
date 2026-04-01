@@ -16,6 +16,7 @@ interface FolderDao {
     @Query(
         """
         SELECT f.id, f.name, f.sortOrder, f.createdAt, f.parentFolderId, f.folderSortOrder,
+               f.audioEnabled, f.autoNextEnabled, f.restDurationSeconds,
                (SELECT COUNT(*) FROM categories c WHERE c.folderId = f.id) +
                (SELECT COUNT(*) FROM folders sf WHERE sf.parentFolderId = f.id) +
                (SELECT COUNT(*) FROM questions q WHERE q.folderId = f.id) AS childCount
@@ -29,6 +30,7 @@ interface FolderDao {
     @Query(
         """
         SELECT f.id, f.name, f.sortOrder, f.createdAt, f.parentFolderId, f.folderSortOrder,
+               f.audioEnabled, f.autoNextEnabled, f.restDurationSeconds,
                (SELECT COUNT(*) FROM categories c WHERE c.folderId = f.id) +
                (SELECT COUNT(*) FROM folders sf WHERE sf.parentFolderId = f.id) +
                (SELECT COUNT(*) FROM questions q WHERE q.folderId = f.id) AS childCount

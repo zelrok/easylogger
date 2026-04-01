@@ -24,5 +24,6 @@ data class Category(
     val sortOrder: Int = 0,
     val createdAt: Long = System.currentTimeMillis(),
     val folderId: Long? = null,
-    val folderSortOrder: Int = 0
+    val folderSortOrder: Int = 0,
+    val desiredDurationSeconds: Int? = null
 )

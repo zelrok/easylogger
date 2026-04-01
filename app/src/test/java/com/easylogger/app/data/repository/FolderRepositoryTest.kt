@@ -116,6 +116,7 @@ class FakeFolderDao : FolderDao {
         FolderWithCount(
             folder.id, folder.name, folder.sortOrder, folder.createdAt,
             folder.parentFolderId, folder.folderSortOrder,
+            folder.audioEnabled, folder.autoNextEnabled, folder.restDurationSeconds,
             childCount = folders.count { it.parentFolderId == folder.id }
         )
 

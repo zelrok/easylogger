@@ -110,7 +110,7 @@ class FakeQuestionDao : QuestionDao {
             QuestionWithLastAnswer(
                 it.id, it.name, it.answerType, it.textOptions,
                 it.scaleMin, it.scaleMax, it.sortOrder, it.createdAt,
-                null, null, it.folderId, it.folderSortOrder
+                null, null, it.folderId, it.folderSortOrder, it.desiredDurationSeconds
             )
         }
 
@@ -169,6 +169,9 @@ class FakeQuestionDao : QuestionDao {
         }
         flow.value = this.questions.toList()
     }
+
+    override suspend fun getQuestionsInFolderOrdered(folderId: Long): List<Question> =
+        questions.filter { it.folderId == folderId }.sortedBy { it.folderSortOrder }
 
     override suspend fun getAllList(): List<Question> = questions.toList()
 

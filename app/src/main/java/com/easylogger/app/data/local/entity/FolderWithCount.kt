@@ -7,5 +7,8 @@ data class FolderWithCount(
     val createdAt: Long,
     val parentFolderId: Long?,
     val folderSortOrder: Int,
+    val audioEnabled: Boolean,
+    val autoNextEnabled: Boolean,
+    val restDurationSeconds: Int?,
     val childCount: Int
 )

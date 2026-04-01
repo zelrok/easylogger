@@ -83,7 +83,7 @@ class FakeCategoryDao : CategoryDao {
         list.map {
             CategoryWithLastLog(
                 it.id, it.name, it.sortOrder, it.createdAt, null,
-                it.folderId, it.folderSortOrder
+                it.folderId, it.folderSortOrder, it.desiredDurationSeconds
             )
         }
 
@@ -145,6 +145,9 @@ class FakeCategoryDao : CategoryDao {
         }
         flow.value = this.categories.toList()
     }
+
+    override suspend fun getCategoriesInFolderOrdered(folderId: Long): List<Category> =
+        categories.filter { it.folderId == folderId }.sortedBy { it.folderSortOrder }
 
     override suspend fun getAllList(): List<Category> = categories.toList()
 

@@ -16,7 +16,7 @@ interface QuestionDao {
     @Query(
         """
         SELECT q.id, q.name, q.answerType, q.textOptions, q.scaleMin, q.scaleMax,
-               q.sortOrder, q.createdAt, q.folderId, q.folderSortOrder,
+               q.sortOrder, q.createdAt, q.folderId, q.folderSortOrder, q.desiredDurationSeconds,
                (SELECT a.value FROM answers a WHERE a.questionId = q.id ORDER BY a.createdAt DESC LIMIT 1) AS lastAnswerValue,
                (SELECT MAX(a.createdAt) FROM answers a WHERE a.questionId = q.id) AS lastAnswerTimestamp
         FROM questions q
@@ -29,7 +29,7 @@ interface QuestionDao {
     @Query(
         """
         SELECT q.id, q.name, q.answerType, q.textOptions, q.scaleMin, q.scaleMax,
-               q.sortOrder, q.createdAt, q.folderId, q.folderSortOrder,
+               q.sortOrder, q.createdAt, q.folderId, q.folderSortOrder, q.desiredDurationSeconds,
                (SELECT a.value FROM answers a WHERE a.questionId = q.id ORDER BY a.createdAt DESC LIMIT 1) AS lastAnswerValue,
                (SELECT MAX(a.createdAt) FROM answers a WHERE a.questionId = q.id) AS lastAnswerTimestamp
         FROM questions q
@@ -85,6 +85,9 @@ interface QuestionDao {
 
     @Update
     suspend fun updateAll(questions: List<Question>)
+
+    @Query("SELECT * FROM questions WHERE folderId = :folderId ORDER BY folderSortOrder ASC")
+    suspend fun getQuestionsInFolderOrdered(folderId: Long): List<Question>
 
     @Delete
     suspend fun delete(question: Question)
