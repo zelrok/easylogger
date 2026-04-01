@@ -23,6 +23,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.easylogger.app.R
+import com.easylogger.app.ui.components.ScaleNumberInput
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -59,7 +60,7 @@ fun EditAnswerDialog(
                             }
                         }
                     }
-                } else {
+                } else if (scaleMax - scaleMin + 1 <= 20) {
                     Spacer(modifier = Modifier.height(8.dp))
                     FlowRow(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -78,6 +79,14 @@ fun EditAnswerDialog(
                             }
                         }
                     }
+                } else {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    ScaleNumberInput(
+                        scaleMin = scaleMin,
+                        scaleMax = scaleMax,
+                        initialValue = selectedValue,
+                        onValueChange = { selectedValue = it }
+                    )
                 }
             }
         },

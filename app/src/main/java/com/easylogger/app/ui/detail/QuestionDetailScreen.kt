@@ -27,6 +27,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import com.easylogger.app.ui.components.ScaleNumberInput
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -128,7 +129,7 @@ fun QuestionDetailScreen(
                                 }
                             }
                         }
-                    } else {
+                    } else if (q.scaleMax - q.scaleMin + 1 <= 20) {
                         FlowRow(
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                             verticalArrangement = Arrangement.spacedBy(8.dp)
@@ -141,6 +142,12 @@ fun QuestionDetailScreen(
                                 }
                             }
                         }
+                    } else {
+                        ScaleNumberInput(
+                            scaleMin = q.scaleMin,
+                            scaleMax = q.scaleMax,
+                            onSubmit = { viewModel.submitAnswer(it) }
+                        )
                     }
                 }
             }
