@@ -8,4 +8,7 @@ sealed class NavRoutes(val route: String) {
     data object QuestionDetail : NavRoutes("question/{questionId}") {
         fun createRoute(questionId: Long) = "question/$questionId"
     }
+    data object BlockRun : NavRoutes("blockrun/{folderId}") {
+        fun createRoute(folderId: Long) = "blockrun/$folderId"
+    }
 }

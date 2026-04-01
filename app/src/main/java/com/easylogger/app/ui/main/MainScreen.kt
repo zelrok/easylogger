@@ -5,9 +5,11 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
@@ -24,6 +26,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CreateNewFolder
 import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -68,6 +71,7 @@ import sh.calvin.reorderable.rememberReorderableLazyListState
 fun MainScreen(
     onCategoryClick: (Long) -> Unit,
     onQuestionClick: (Long) -> Unit,
+    onBlockRunClick: (Long) -> Unit,
     activity: MainActivity,
     viewModel: CategoryListViewModel = hiltViewModel()
 ) {
@@ -219,28 +223,37 @@ fun MainScreen(
             )
         },
         floatingActionButton = {
-            Box {
-                FloatingActionButton(onClick = { showFabMenu = true }) {
-                    Icon(Icons.Default.Add, contentDescription = stringResource(R.string.add_item))
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                if (state.isInsideFolder) {
+                    FloatingActionButton(
+                        onClick = { state.currentFolderId?.let { onBlockRunClick(it) } }
+                    ) {
+                        Icon(Icons.Default.PlayArrow, contentDescription = stringResource(R.string.run_as_block))
+                    }
                 }
-                DropdownMenu(
-                    expanded = showFabMenu,
-                    onDismissRequest = { showFabMenu = false }
-                ) {
-                    DropdownMenuItem(
-                        text = { Text(stringResource(R.string.add_category)) },
-                        onClick = {
-                            showFabMenu = false
-                            showAddCategoryDialog = true
-                        }
-                    )
-                    DropdownMenuItem(
-                        text = { Text(stringResource(R.string.add_question)) },
-                        onClick = {
-                            showFabMenu = false
-                            showAddQuestionDialog = true
-                        }
-                    )
+                Box {
+                    FloatingActionButton(onClick = { showFabMenu = true }) {
+                        Icon(Icons.Default.Add, contentDescription = stringResource(R.string.add_item))
+                    }
+                    DropdownMenu(
+                        expanded = showFabMenu,
+                        onDismissRequest = { showFabMenu = false }
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.add_category)) },
+                            onClick = {
+                                showFabMenu = false
+                                showAddCategoryDialog = true
+                            }
+                        )
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.add_question)) },
+                            onClick = {
+                                showFabMenu = false
+                                showAddQuestionDialog = true
+                            }
+                        )
+                    }
                 }
             }
         }
