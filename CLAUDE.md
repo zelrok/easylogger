@@ -28,7 +28,8 @@ Single-module Android app (`com.easylogger.app`) using single-Activity + Jetpack
 - **data/repository/** — @Singleton repositories wrapping DAOs. Business logic lives here (sort order calculation, timestamp formatting).
 - **di/DatabaseModule.kt** — Hilt module providing AppDatabase and all DAOs at SingletonComponent scope.
 - **ui/main/** — Home screen: category/folder/question list+grid with drag-to-reorder, folder navigation via BackHandler. FAB opens chooser menu (Add Category / Add Question). Play FAB in folder view launches block run. Folder settings dialog for block run configuration.
-- **ui/detail/** — Log history screen: paged entries (Paging 3, 50/page), Log Now (500ms cooldown), Log Start/Stop (time windows), manual date/time entry with start+end. Question detail screen: paged answers with text option buttons or numbered scale buttons.
+- **ui/components/** — Shared composables. ScaleNumberInput: number text field for scale questions with large ranges (>20 values), with submit mode (field + button) and inline mode (field only).
+- **ui/detail/** — Log history screen: paged entries (Paging 3, 50/page), Log Now (500ms cooldown), Log Start/Stop (time windows), manual date/time entry with start+end. Question detail screen: paged answers with text option buttons, numbered scale buttons, or number input for large ranges.
 - **ui/blockrun/** — Block run screen: sequential run through folder items with countdown timer, pause/resume, elapsed timer, category logging (instant/start-stop), question answering, rest periods, audio ding, and auto-next mode.
 - **ui/navigation/** — NavRoutes sealed class with Main, Detail(categoryId), QuestionDetail(questionId), and BlockRun(folderId) routes.
 - **export/CsvExporter.kt** — CSV export via SAF with UTF-8 BOM and ISO 8601 timestamps. Log entries: category, start_time, end_time, created_at. Answers: question, answer, answered_at.
@@ -83,6 +84,10 @@ All features from the spec are implemented. The app is production-ready at v1.6.
 ### v1.6.0 (2026-04-01) — versionCode 7
 
 - **Run as Block:** Folders can be run as sequential blocks via Play FAB. Block run screen steps through each item (categories and questions) in folder sort order. Folder settings dialog configures Audio (ding on timer complete via ToneGenerator), Auto Next (automatically advance and log categories as start/stop durations), and Rest Duration (timed rest period between items). Categories and questions gain optional `desiredDurationSeconds` for per-item countdown timers. Block run UI features: countdown timer with progress bar, elapsed count-up timer for open log entries, pause/resume that freezes both timers, Log Now / Log Start / Log Stop for categories, text option and scale answer buttons for questions, skip rest, and completion screen. Buttons styled as large square targets with titleLarge text. Room migration v5→v6.
+
+#### Bug fixes (unreleased, bugfix/scale-input-field)
+
+- **Scale input field:** Scale questions with >20 values now show a number text input instead of an unwieldy button grid. Applies to QuestionDetailScreen, BlockRunScreen, and EditAnswerDialog.
 
 ### v1.5.0 (2026-03-31) — versionCode 6
 
