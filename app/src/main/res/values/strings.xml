@@ -59,4 +59,18 @@
     <string name="export_answers_csv">Export Answers</string>
     <string name="answer_export_empty">No answers to export yet.</string>
     <string name="answer_export_success">Exported %1$d answers to %2$s</string>
+    <string name="folder_settings">Folder Settings</string>
+    <string name="audio_enabled">Audio</string>
+    <string name="auto_next_enabled">Auto Next</string>
+    <string name="rest_duration_hint">Rest between items (seconds)</string>
+    <string name="duration_seconds_hint">Duration (seconds)</string>
+    <string name="run_as_block">Run as Block</string>
+    <string name="block_complete">Block Complete!</string>
+    <string name="rest">Rest</string>
+    <string name="skip">Skip</string>
+    <string name="pause">Pause</string>
+    <string name="resume">Resume</string>
+    <string name="done">Done</string>
+    <string name="item_progress">%1$d / %2$d</string>
+    <string name="stop">Stop</string>
 </resources>

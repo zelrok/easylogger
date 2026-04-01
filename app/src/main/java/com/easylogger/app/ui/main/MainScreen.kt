@@ -24,6 +24,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CreateNewFolder
 import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -83,6 +84,7 @@ fun MainScreen(
     var editingQuestion by remember { mutableStateOf<QuestionWithLastAnswer?>(null) }
     var deletingQuestion by remember { mutableStateOf<QuestionWithLastAnswer?>(null) }
     var showOverflowMenu by remember { mutableStateOf(false) }
+    var showFolderSettingsDialog by remember { mutableStateOf(false) }
 
     val exportEmptyMsg = stringResource(R.string.export_empty)
     val exportSuccessMsg = stringResource(R.string.export_success)
@@ -158,6 +160,14 @@ fun MainScreen(
                     }
                 },
                 actions = {
+                    if (state.isInsideFolder) {
+                        IconButton(onClick = { showFolderSettingsDialog = true }) {
+                            Icon(
+                                Icons.Default.Settings,
+                                contentDescription = stringResource(R.string.folder_settings)
+                            )
+                        }
+                    }
                     IconButton(onClick = { showAddFolderDialog = true }) {
                         Icon(
                             Icons.Default.CreateNewFolder,
@@ -331,9 +341,10 @@ fun MainScreen(
 
     if (showAddCategoryDialog) {
         AddEditCategoryDialog(
+            showDuration = state.currentFolderIsTimed,
             onDismiss = { showAddCategoryDialog = false },
-            onSave = { name ->
-                viewModel.addCategory(name)
+            onSave = { name, duration ->
+                viewModel.addCategory(name, duration)
                 showAddCategoryDialog = false
             }
         )
@@ -341,9 +352,10 @@ fun MainScreen(
 
     if (showAddQuestionDialog) {
         AddEditQuestionDialog(
+            showDuration = state.currentFolderIsTimed,
             onDismiss = { showAddQuestionDialog = false },
-            onSave = { name, answerType, textOptions, scaleMin, scaleMax ->
-                viewModel.addQuestion(name, answerType, textOptions, scaleMin, scaleMax)
+            onSave = { name, answerType, textOptions, scaleMin, scaleMax, duration ->
+                viewModel.addQuestion(name, answerType, textOptions, scaleMin, scaleMax, duration)
                 showAddQuestionDialog = false
             }
         )
@@ -362,8 +374,10 @@ fun MainScreen(
     editingCategory?.let { category ->
         AddEditCategoryDialog(
             initialName = category.name,
+            initialDurationSeconds = category.desiredDurationSeconds,
+            showDuration = state.currentFolderIsTimed,
             onDismiss = { editingCategory = null },
-            onSave = { name ->
+            onSave = { name, duration ->
                 viewModel.updateCategory(
                     Category(
                         id = category.id,
@@ -371,7 +385,8 @@ fun MainScreen(
                         sortOrder = category.sortOrder,
                         createdAt = category.createdAt,
                         folderId = category.folderId,
-                        folderSortOrder = category.folderSortOrder
+                        folderSortOrder = category.folderSortOrder,
+                        desiredDurationSeconds = duration
                     )
                 )
                 editingCategory = null
@@ -391,7 +406,10 @@ fun MainScreen(
                         sortOrder = folder.sortOrder,
                         createdAt = folder.createdAt,
                         parentFolderId = folder.parentFolderId,
-                        folderSortOrder = folder.folderSortOrder
+                        folderSortOrder = folder.folderSortOrder,
+                        audioEnabled = folder.audioEnabled,
+                        autoNextEnabled = folder.autoNextEnabled,
+                        restDurationSeconds = folder.restDurationSeconds
                     )
                 )
                 editingFolder = null
@@ -406,8 +424,10 @@ fun MainScreen(
             initialTextOptions = question.textOptions ?: "",
             initialScaleMin = question.scaleMin,
             initialScaleMax = question.scaleMax,
+            initialDurationSeconds = question.desiredDurationSeconds,
+            showDuration = state.currentFolderIsTimed,
             onDismiss = { editingQuestion = null },
-            onSave = { name, answerType, textOptions, scaleMin, scaleMax ->
+            onSave = { name, answerType, textOptions, scaleMin, scaleMax, duration ->
                 viewModel.updateQuestion(
                     Question(
                         id = question.id,
@@ -419,7 +439,8 @@ fun MainScreen(
                         sortOrder = question.sortOrder,
                         createdAt = question.createdAt,
                         folderId = question.folderId,
-                        folderSortOrder = question.folderSortOrder
+                        folderSortOrder = question.folderSortOrder,
+                        desiredDurationSeconds = duration
                     )
                 )
                 editingQuestion = null
@@ -445,6 +466,19 @@ fun MainScreen(
             onConfirm = {
                 viewModel.deleteFolder(folder)
                 deletingFolder = null
+            }
+        )
+    }
+
+    if (showFolderSettingsDialog && state.currentFolderId != null) {
+        FolderSettingsDialog(
+            initialAudioEnabled = state.currentFolderAudioEnabled,
+            initialAutoNextEnabled = state.currentFolderAutoNextEnabled,
+            initialRestDurationSeconds = state.currentFolderRestDuration,
+            onDismiss = { showFolderSettingsDialog = false },
+            onSave = { audio, autoNext, rest ->
+                viewModel.updateFolderSettings(state.currentFolderId!!, audio, autoNext, rest)
+                showFolderSettingsDialog = false
             }
         )
     }

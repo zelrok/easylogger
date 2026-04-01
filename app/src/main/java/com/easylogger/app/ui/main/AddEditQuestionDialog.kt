@@ -28,14 +28,19 @@ fun AddEditQuestionDialog(
     initialTextOptions: String = "",
     initialScaleMin: Int = 1,
     initialScaleMax: Int = 5,
+    initialDurationSeconds: Int? = null,
+    showDuration: Boolean = false,
     onDismiss: () -> Unit,
-    onSave: (name: String, answerType: String, textOptions: String?, scaleMin: Int, scaleMax: Int) -> Unit
+    onSave: (name: String, answerType: String, textOptions: String?, scaleMin: Int, scaleMax: Int, durationSeconds: Int?) -> Unit
 ) {
     var name by remember { mutableStateOf(initialName) }
     var answerType by remember { mutableStateOf(initialAnswerType) }
     var textOptions by remember { mutableStateOf(initialTextOptions) }
     var scaleMin by remember { mutableStateOf(initialScaleMin.toString()) }
     var scaleMax by remember { mutableStateOf(initialScaleMax.toString()) }
+    var duration by remember {
+        mutableStateOf(initialDurationSeconds?.toString() ?: "")
+    }
 
     val isValid = name.isNotBlank() && when (answerType) {
         "TEXT" -> textOptions.isNotBlank() && textOptions.split(",").any { it.trim().isNotEmpty() }
@@ -106,17 +111,29 @@ fun AddEditQuestionDialog(
                         )
                     }
                 }
+                if (showDuration) {
+                    Spacer(modifier = Modifier.height(12.dp))
+                    OutlinedTextField(
+                        value = duration,
+                        onValueChange = { duration = it.filter { c -> c.isDigit() }.take(5) },
+                        label = { Text(stringResource(R.string.duration_seconds_hint)) },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
             }
         },
         confirmButton = {
             TextButton(
                 onClick = {
+                    val dur = if (showDuration) duration.toIntOrNull()?.takeIf { it > 0 } else initialDurationSeconds
                     onSave(
                         name.trim(),
                         answerType,
                         if (answerType == "TEXT") textOptions.trim() else null,
                         scaleMin.toIntOrNull() ?: 1,
-                        scaleMax.toIntOrNull() ?: 5
+                        scaleMax.toIntOrNull() ?: 5,
+                        dur
                     )
                 },
                 enabled = isValid

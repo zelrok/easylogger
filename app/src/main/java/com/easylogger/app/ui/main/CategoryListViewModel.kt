@@ -36,11 +36,15 @@ data class MainScreenState(
     val folderStack: List<FolderStackEntry> = emptyList(),
     val viewMode: String = UserPreferenceRepository.VIEW_MODE_LIST,
     val isLoading: Boolean = true,
-    val dragOverFolderId: Long? = null
+    val dragOverFolderId: Long? = null,
+    val currentFolderAudioEnabled: Boolean = false,
+    val currentFolderAutoNextEnabled: Boolean = false,
+    val currentFolderRestDuration: Int? = null
 ) {
     val currentFolderId: Long? get() = folderStack.lastOrNull()?.folderId
     val currentFolderName: String? get() = folderStack.lastOrNull()?.folderName
     val isInsideFolder: Boolean get() = folderStack.isNotEmpty()
+    val currentFolderIsTimed: Boolean get() = currentFolderAudioEnabled || currentFolderAutoNextEnabled
 }
 
 sealed class MainScreenEvent {
@@ -117,12 +121,28 @@ class CategoryListViewModel @Inject constructor(
         }
     }
 
+    private val _currentFolderSettings = MutableStateFlow<com.easylogger.app.data.local.entity.Folder?>(null)
+
+    init {
+        viewModelScope.launch {
+            _folderStack.collect { stack ->
+                val folderId = stack.lastOrNull()?.folderId
+                _currentFolderSettings.value = if (folderId != null) {
+                    folderRepository.getById(folderId)
+                } else {
+                    null
+                }
+            }
+        }
+    }
+
     val state: StateFlow<MainScreenState> = combine(
         topLevelFlow,
         folderItemsFlow,
         userPreferenceRepository.getViewMode(),
         _folderStack,
-        _dragOverFolderId
+        _dragOverFolderId,
+        _currentFolderSettings
     ) { args ->
         @Suppress("UNCHECKED_CAST")
         val topLevel = args[0] as List<MainListItem>
@@ -132,6 +152,7 @@ class CategoryListViewModel @Inject constructor(
         @Suppress("UNCHECKED_CAST")
         val stack = args[3] as List<FolderStackEntry>
         val dragOver = args[4] as Long?
+        val currentFolder = args[5] as? com.easylogger.app.data.local.entity.Folder
 
         MainScreenState(
             topLevelItems = topLevel,
@@ -139,7 +160,10 @@ class CategoryListViewModel @Inject constructor(
             folderStack = stack,
             viewMode = viewMode,
             isLoading = false,
-            dragOverFolderId = dragOver
+            dragOverFolderId = dragOver,
+            currentFolderAudioEnabled = currentFolder?.audioEnabled ?: false,
+            currentFolderAutoNextEnabled = currentFolder?.autoNextEnabled ?: false,
+            currentFolderRestDuration = currentFolder?.restDurationSeconds
         )
     }.stateIn(
         scope = viewModelScope,
@@ -149,10 +173,10 @@ class CategoryListViewModel @Inject constructor(
 
     // --- Category operations ---
 
-    fun addCategory(name: String) {
+    fun addCategory(name: String, desiredDurationSeconds: Int? = null) {
         viewModelScope.launch {
             val currentFolder = _folderStack.value.lastOrNull()?.folderId
-            categoryRepository.insert(name, currentFolder)
+            categoryRepository.insert(name, currentFolder, desiredDurationSeconds)
         }
     }
 
@@ -226,6 +250,18 @@ class CategoryListViewModel @Inject constructor(
         }
     }
 
+    fun updateFolderSettings(
+        folderId: Long,
+        audioEnabled: Boolean,
+        autoNextEnabled: Boolean,
+        restDurationSeconds: Int?
+    ) {
+        viewModelScope.launch {
+            folderRepository.updateSettings(folderId, audioEnabled, autoNextEnabled, restDurationSeconds)
+            _currentFolderSettings.value = folderRepository.getById(folderId)
+        }
+    }
+
     // --- Question operations ---
 
     fun addQuestion(
@@ -233,11 +269,12 @@ class CategoryListViewModel @Inject constructor(
         answerType: String,
         textOptions: String?,
         scaleMin: Int,
-        scaleMax: Int
+        scaleMax: Int,
+        desiredDurationSeconds: Int? = null
     ) {
         viewModelScope.launch {
             val currentFolder = _folderStack.value.lastOrNull()?.folderId
-            questionRepository.insert(name, answerType, textOptions, scaleMin, scaleMax, currentFolder)
+            questionRepository.insert(name, answerType, textOptions, scaleMin, scaleMax, currentFolder, desiredDurationSeconds)
         }
     }
 
@@ -382,7 +419,8 @@ class CategoryListViewModel @Inject constructor(
                                 sortOrder = index,
                                 createdAt = cwl.createdAt,
                                 folderId = cwl.folderId,
-                                folderSortOrder = cwl.folderSortOrder
+                                folderSortOrder = cwl.folderSortOrder,
+                                desiredDurationSeconds = cwl.desiredDurationSeconds
                             )
                         )
                     }
@@ -395,7 +433,10 @@ class CategoryListViewModel @Inject constructor(
                                 sortOrder = index,
                                 createdAt = fwc.createdAt,
                                 parentFolderId = fwc.parentFolderId,
-                                folderSortOrder = fwc.folderSortOrder
+                                folderSortOrder = fwc.folderSortOrder,
+                                audioEnabled = fwc.audioEnabled,
+                                autoNextEnabled = fwc.autoNextEnabled,
+                                restDurationSeconds = fwc.restDurationSeconds
                             )
                         )
                     }
@@ -412,7 +453,8 @@ class CategoryListViewModel @Inject constructor(
                                 sortOrder = index,
                                 createdAt = qwa.createdAt,
                                 folderId = qwa.folderId,
-                                folderSortOrder = qwa.folderSortOrder
+                                folderSortOrder = qwa.folderSortOrder,
+                                desiredDurationSeconds = qwa.desiredDurationSeconds
                             )
                         )
                     }
@@ -450,7 +492,8 @@ class CategoryListViewModel @Inject constructor(
                                 sortOrder = cwl.sortOrder,
                                 createdAt = cwl.createdAt,
                                 folderId = cwl.folderId,
-                                folderSortOrder = index
+                                folderSortOrder = index,
+                                desiredDurationSeconds = cwl.desiredDurationSeconds
                             )
                         )
                     }
@@ -463,7 +506,10 @@ class CategoryListViewModel @Inject constructor(
                                 sortOrder = fwc.sortOrder,
                                 createdAt = fwc.createdAt,
                                 parentFolderId = fwc.parentFolderId,
-                                folderSortOrder = index
+                                folderSortOrder = index,
+                                audioEnabled = fwc.audioEnabled,
+                                autoNextEnabled = fwc.autoNextEnabled,
+                                restDurationSeconds = fwc.restDurationSeconds
                             )
                         )
                     }
@@ -480,7 +526,8 @@ class CategoryListViewModel @Inject constructor(
                                 sortOrder = qwa.sortOrder,
                                 createdAt = qwa.createdAt,
                                 folderId = qwa.folderId,
-                                folderSortOrder = index
+                                folderSortOrder = index,
+                                desiredDurationSeconds = qwa.desiredDurationSeconds
                             )
                         )
                     }
