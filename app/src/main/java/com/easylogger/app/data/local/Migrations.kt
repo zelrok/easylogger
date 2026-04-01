@@ -3,6 +3,41 @@ package com.easylogger.app.data.local
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 
+val MIGRATION_4_5 = object : Migration(4, 5) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS questions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                name TEXT NOT NULL,
+                answerType TEXT NOT NULL,
+                textOptions TEXT,
+                scaleMin INTEGER NOT NULL DEFAULT 1,
+                scaleMax INTEGER NOT NULL DEFAULT 5,
+                sortOrder INTEGER NOT NULL DEFAULT 0,
+                createdAt INTEGER NOT NULL DEFAULT 0,
+                folderId INTEGER DEFAULT NULL REFERENCES folders(id) ON DELETE SET NULL,
+                folderSortOrder INTEGER NOT NULL DEFAULT 0
+            )
+            """
+        )
+        db.execSQL("CREATE INDEX IF NOT EXISTS index_questions_folderId ON questions(folderId)")
+
+        db.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS answers (
+                id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                questionId INTEGER NOT NULL,
+                value TEXT NOT NULL,
+                createdAt INTEGER NOT NULL DEFAULT 0,
+                FOREIGN KEY (questionId) REFERENCES questions(id) ON DELETE CASCADE
+            )
+            """
+        )
+        db.execSQL("CREATE INDEX IF NOT EXISTS index_answers_questionId ON answers(questionId)")
+    }
+}
+
 val MIGRATION_3_4 = object : Migration(3, 4) {
     override fun migrate(db: SupportSQLiteDatabase) {
         db.execSQL("ALTER TABLE folders ADD COLUMN parentFolderId INTEGER DEFAULT NULL REFERENCES folders(id) ON DELETE SET NULL")

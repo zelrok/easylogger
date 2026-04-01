@@ -24,6 +24,9 @@ class MainActivity : ComponentActivity() {
     private val _exportResult = MutableSharedFlow<Result<Pair<Int, String>>>()
     val exportResult = _exportResult.asSharedFlow()
 
+    private val _answerExportResult = MutableSharedFlow<Result<Pair<Int, String>>>()
+    val answerExportResult = _answerExportResult.asSharedFlow()
+
     val createDocumentLauncher = registerForActivityResult(
         ActivityResultContracts.CreateDocument("text/csv")
     ) { uri ->
@@ -38,6 +41,25 @@ class MainActivity : ComponentActivity() {
                     }
                 } catch (e: Exception) {
                     _exportResult.emit(Result.failure(e))
+                }
+            }
+        }
+    }
+
+    val createAnswerDocumentLauncher = registerForActivityResult(
+        ActivityResultContracts.CreateDocument("text/csv")
+    ) { uri ->
+        if (uri != null) {
+            lifecycleScope.launch {
+                try {
+                    val outputStream = contentResolver.openOutputStream(uri)
+                    if (outputStream != null) {
+                        val count = csvExporter.exportAnswers(outputStream)
+                        val filename = uri.lastPathSegment ?: "answers_export.csv"
+                        _answerExportResult.emit(Result.success(Pair(count, filename)))
+                    }
+                } catch (e: Exception) {
+                    _answerExportResult.emit(Result.failure(e))
                 }
             }
         }

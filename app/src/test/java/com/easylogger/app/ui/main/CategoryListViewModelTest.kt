@@ -1,12 +1,16 @@
 package com.easylogger.app.ui.main
 
+import com.easylogger.app.data.repository.AnswerRepository
 import com.easylogger.app.data.repository.CategoryRepository
+import com.easylogger.app.data.repository.FakeAnswerDao
 import com.easylogger.app.data.repository.FakeCategoryDao
 import com.easylogger.app.data.repository.FakeFolderDao
 import com.easylogger.app.data.repository.FakeLogEntryDao
+import com.easylogger.app.data.repository.FakeQuestionDao
 import com.easylogger.app.data.repository.FakeUserPreferenceDao
 import com.easylogger.app.data.repository.FolderRepository
 import com.easylogger.app.data.repository.LogEntryRepository
+import com.easylogger.app.data.repository.QuestionRepository
 import com.easylogger.app.data.repository.UserPreferenceRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -33,6 +37,8 @@ class CategoryListViewModelTest {
     private lateinit var categoryRepository: CategoryRepository
     private lateinit var folderRepository: FolderRepository
     private lateinit var logEntryRepository: LogEntryRepository
+    private lateinit var questionRepository: QuestionRepository
+    private lateinit var answerRepository: AnswerRepository
     private lateinit var userPreferenceRepository: UserPreferenceRepository
 
     @Before
@@ -41,9 +47,12 @@ class CategoryListViewModelTest {
         categoryRepository = CategoryRepository(FakeCategoryDao())
         folderRepository = FolderRepository(FakeFolderDao())
         logEntryRepository = LogEntryRepository(FakeLogEntryDao())
+        questionRepository = QuestionRepository(FakeQuestionDao())
+        answerRepository = AnswerRepository(FakeAnswerDao())
         userPreferenceRepository = UserPreferenceRepository(FakeUserPreferenceDao())
         viewModel = CategoryListViewModel(
-            categoryRepository, folderRepository, logEntryRepository, userPreferenceRepository
+            categoryRepository, folderRepository, logEntryRepository,
+            questionRepository, answerRepository, userPreferenceRepository
         )
     }
 
@@ -207,5 +216,85 @@ class CategoryListViewModelTest {
         advanceUntilIdle()
         assertFalse(viewModel.state.value.isLoading)
         collectJob.cancel()
+    }
+
+    @Test
+    fun `addQuestion adds text question to top-level items`() = runTest {
+        val collectJob = launch(testDispatcher) { viewModel.state.collect {} }
+        viewModel.addQuestion("How do you feel?", "TEXT", "good,ok,bad", 1, 5)
+        advanceUntilIdle()
+        val state = viewModel.state.value
+        assertEquals(1, state.topLevelItems.size)
+        val item = state.topLevelItems[0] as MainListItem.QuestionItem
+        assertEquals("How do you feel?", item.data.name)
+        assertEquals("TEXT", item.data.answerType)
+        collectJob.cancel()
+    }
+
+    @Test
+    fun `addQuestion adds scale question to top-level items`() = runTest {
+        val collectJob = launch(testDispatcher) { viewModel.state.collect {} }
+        viewModel.addQuestion("Rate your mood", "SCALE", null, 1, 10)
+        advanceUntilIdle()
+        val state = viewModel.state.value
+        assertEquals(1, state.topLevelItems.size)
+        val item = state.topLevelItems[0] as MainListItem.QuestionItem
+        assertEquals("Rate your mood", item.data.name)
+        assertEquals("SCALE", item.data.answerType)
+        collectJob.cancel()
+    }
+
+    @Test
+    fun `questions and categories sort together`() = runTest {
+        val collectJob = launch(testDispatcher) { viewModel.state.collect {} }
+        viewModel.addCategory("Cat 1")
+        advanceUntilIdle()
+        viewModel.addQuestion("Q1", "TEXT", "yes,no", 1, 5)
+        advanceUntilIdle()
+        viewModel.addCategory("Cat 2")
+        advanceUntilIdle()
+        val state = viewModel.state.value
+        assertEquals(3, state.topLevelItems.size)
+        assertTrue(state.topLevelItems[0] is MainListItem.CategoryItem)
+        assertTrue(state.topLevelItems[1] is MainListItem.QuestionItem)
+        assertTrue(state.topLevelItems[2] is MainListItem.CategoryItem)
+        collectJob.cancel()
+    }
+
+    @Test
+    fun `addQuestion inside folder adds to folder items`() = runTest {
+        val collectJob = launch(testDispatcher) { viewModel.state.collect {} }
+        viewModel.addFolder("Parent")
+        advanceUntilIdle()
+        val folder = viewModel.state.value.topLevelItems[0] as MainListItem.FolderItem
+        viewModel.enterFolder(folder.data.id, folder.data.name)
+        advanceUntilIdle()
+        viewModel.addQuestion("Folder Q", "TEXT", "a,b", 1, 5)
+        advanceUntilIdle()
+        val folderItems = viewModel.state.value.folderItems
+        assertEquals(1, folderItems.size)
+        val item = folderItems[0] as MainListItem.QuestionItem
+        assertEquals("Folder Q", item.data.name)
+        collectJob.cancel()
+    }
+
+    @Test
+    fun `deleteQuestion removes from top-level items`() = runTest {
+        val collectJob = launch(testDispatcher) { viewModel.state.collect {} }
+        viewModel.addQuestion("Q1", "TEXT", "yes,no", 1, 5)
+        advanceUntilIdle()
+        val item = viewModel.state.value.topLevelItems[0] as MainListItem.QuestionItem
+        viewModel.deleteQuestion(item.data)
+        advanceUntilIdle()
+        assertTrue(viewModel.state.value.topLevelItems.isEmpty())
+        collectJob.cancel()
+    }
+
+    @Test
+    fun `requestAnswerExport emits empty event when no answers`() = runTest {
+        viewModel.requestAnswerExport()
+        advanceUntilIdle()
+        val event = viewModel.events.first()
+        assert(event is MainScreenEvent.AnswerExportEmpty)
     }
 }
