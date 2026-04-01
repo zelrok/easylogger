@@ -264,6 +264,17 @@ class BlockRunViewModel @Inject constructor(
                     totalSeconds = duration,
                     remainingSeconds = duration
                 )
+                // Auto-start log entry for categories when auto-next is on
+                if (s.autoNextEnabled && item is BlockItem.CategoryBlockItem) {
+                    viewModelScope.launch {
+                        val now = System.currentTimeMillis()
+                        openLogEntryId = logEntryRepository.insertStart(item.category.id, now)
+                        _state.value = _state.value.copy(
+                            hasOpenLogEntry = true,
+                            logStartTimeMillis = now
+                        )
+                    }
+                }
                 startCountdown(duration)
             }
         }
@@ -299,14 +310,16 @@ class BlockRunViewModel @Inject constructor(
         } else if (s.phase == BlockRunPhase.SHOWING_ITEM) {
             // Auto-advance if autoNext is on
             if (s.autoNextEnabled) {
-                // For categories, create an instant log if no entry was made
                 val current = s.currentItem
-                if (current is BlockItem.CategoryBlockItem && !s.hasOpenLogEntry) {
+                if (current is BlockItem.CategoryBlockItem && s.hasOpenLogEntry) {
+                    // Stop the auto-started entry with current time as end
                     viewModelScope.launch {
-                        logEntryRepository.insertInstant(
-                            current.category.id,
-                            System.currentTimeMillis()
-                        )
+                        val open = logEntryRepository.getOpenEntry(current.category.id).first()
+                        if (open != null) {
+                            logEntryRepository.stopEntry(open, System.currentTimeMillis())
+                        }
+                        openLogEntryId = null
+                        _state.value = _state.value.copy(hasOpenLogEntry = false)
                         advanceToNext()
                     }
                 } else {
