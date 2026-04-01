@@ -22,7 +22,10 @@ class CategoryRepository @Inject constructor(
 
     suspend fun getById(id: Long): Category? = categoryDao.getById(id)
 
-    suspend fun insert(name: String, folderId: Long? = null): Long {
+    suspend fun getCategoriesInFolderOrdered(folderId: Long): List<Category> =
+        categoryDao.getCategoriesInFolderOrdered(folderId)
+
+    suspend fun insert(name: String, folderId: Long? = null, desiredDurationSeconds: Int? = null): Long {
         val category = if (folderId != null) {
             val nextFolderOrder = categoryDao.getNextFolderSortOrder(folderId)
             Category(
@@ -30,14 +33,16 @@ class CategoryRepository @Inject constructor(
                 sortOrder = 0,
                 createdAt = System.currentTimeMillis(),
                 folderId = folderId,
-                folderSortOrder = nextFolderOrder
+                folderSortOrder = nextFolderOrder,
+                desiredDurationSeconds = desiredDurationSeconds
             )
         } else {
             val nextOrder = categoryDao.getNextSortOrder()
             Category(
                 name = name,
                 sortOrder = nextOrder,
-                createdAt = System.currentTimeMillis()
+                createdAt = System.currentTimeMillis(),
+                desiredDurationSeconds = desiredDurationSeconds
             )
         }
         return categoryDao.insert(category)

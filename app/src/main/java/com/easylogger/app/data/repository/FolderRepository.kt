@@ -54,4 +54,20 @@ class FolderRepository @Inject constructor(
         val nextOrder = folderDao.getNextTopLevelSortOrder()
         folderDao.removeFolderFromParent(folderId, nextOrder)
     }
+
+    suspend fun updateSettings(
+        folderId: Long,
+        audioEnabled: Boolean,
+        autoNextEnabled: Boolean,
+        restDurationSeconds: Int?
+    ) {
+        val folder = folderDao.getById(folderId) ?: return
+        folderDao.update(
+            folder.copy(
+                audioEnabled = audioEnabled,
+                autoNextEnabled = autoNextEnabled,
+                restDurationSeconds = restDurationSeconds
+            )
+        )
+    }
 }
