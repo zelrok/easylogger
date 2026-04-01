@@ -24,5 +24,8 @@ data class Folder(
     val sortOrder: Int = 0,
     val createdAt: Long = System.currentTimeMillis(),
     val parentFolderId: Long? = null,
-    val folderSortOrder: Int = 0
+    val folderSortOrder: Int = 0,
+    val audioEnabled: Boolean = false,
+    val autoNextEnabled: Boolean = false,
+    val restDurationSeconds: Int? = null
 )

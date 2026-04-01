@@ -12,5 +12,6 @@ data class QuestionWithLastAnswer(
     val lastAnswerValue: String?,
     val lastAnswerTimestamp: Long?,
     val folderId: Long? = null,
-    val folderSortOrder: Int = 0
+    val folderSortOrder: Int = 0,
+    val desiredDurationSeconds: Int? = null
 )

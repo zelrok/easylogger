@@ -18,7 +18,7 @@ interface CategoryDao {
 
     @Query(
         """
-        SELECT c.id, c.name, c.sortOrder, c.createdAt, c.folderId, c.folderSortOrder,
+        SELECT c.id, c.name, c.sortOrder, c.createdAt, c.folderId, c.folderSortOrder, c.desiredDurationSeconds,
                (SELECT MAX(le.startTime) FROM log_entries le WHERE le.categoryId = c.id) AS lastLogTimestamp
         FROM categories c
         ORDER BY c.sortOrder ASC, c.createdAt ASC
@@ -28,7 +28,7 @@ interface CategoryDao {
 
     @Query(
         """
-        SELECT c.id, c.name, c.sortOrder, c.createdAt, c.folderId, c.folderSortOrder,
+        SELECT c.id, c.name, c.sortOrder, c.createdAt, c.folderId, c.folderSortOrder, c.desiredDurationSeconds,
                (SELECT MAX(le.startTime) FROM log_entries le WHERE le.categoryId = c.id) AS lastLogTimestamp
         FROM categories c
         WHERE c.folderId IS NULL
@@ -39,7 +39,7 @@ interface CategoryDao {
 
     @Query(
         """
-        SELECT c.id, c.name, c.sortOrder, c.createdAt, c.folderId, c.folderSortOrder,
+        SELECT c.id, c.name, c.sortOrder, c.createdAt, c.folderId, c.folderSortOrder, c.desiredDurationSeconds,
                (SELECT MAX(le.startTime) FROM log_entries le WHERE le.categoryId = c.id) AS lastLogTimestamp
         FROM categories c
         WHERE c.folderId = :folderId
@@ -94,6 +94,9 @@ interface CategoryDao {
 
     @Update
     suspend fun updateAll(categories: List<Category>)
+
+    @Query("SELECT * FROM categories WHERE folderId = :folderId ORDER BY folderSortOrder ASC")
+    suspend fun getCategoriesInFolderOrdered(folderId: Long): List<Category>
 
     @Delete
     suspend fun delete(category: Category)
