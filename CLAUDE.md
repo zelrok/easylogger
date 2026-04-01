@@ -79,10 +79,10 @@ All features from the spec are implemented. The app is production-ready at v1.5.
 
 ## Changelog
 
-### WIP — feature/questions (branch, not yet merged)
+### v1.5.0 (2026-03-31) — versionCode 6
 
 - **Questions:** New item type alongside categories. Questions are text prompts with either predefined text options (e.g., "yes/no") or integer scale answers (e.g., 1-5). Question entity with answerType (TEXT/SCALE), textOptions, scaleMin/scaleMax. Answer entity with FK CASCADE to Question. Questions appear in main list alongside categories, support drag-to-reorder, folder membership, and have dedicated detail screen with paged answer history. FAB becomes chooser menu (Add Category / Add Question). Separate "Export Answers" CSV option. Room migration v4→v5. 18 new unit tests.
-- **Remaining work:** QA testing on device, version bump, merge to main.
+- **Bug fixes:** Question delete dialog now shows correct "Delete Question" text instead of "Delete Category". Grid card type badge shows option count for text questions.
 
 ### v1.4.0 (2026-03-29) — versionCode 5
 
