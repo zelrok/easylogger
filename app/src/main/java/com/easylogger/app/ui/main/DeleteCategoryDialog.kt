@@ -11,12 +11,14 @@ import com.easylogger.app.R
 fun DeleteCategoryDialog(
     categoryName: String,
     onDismiss: () -> Unit,
-    onConfirm: () -> Unit
+    onConfirm: () -> Unit,
+    title: String = stringResource(R.string.delete_category),
+    message: String = stringResource(R.string.delete_category_confirm, categoryName)
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.delete_category)) },
-        text = { Text(stringResource(R.string.delete_category_confirm, categoryName)) },
+        title = { Text(title) },
+        text = { Text(message) },
         confirmButton = {
             TextButton(onClick = onConfirm) {
                 Text(stringResource(R.string.delete))

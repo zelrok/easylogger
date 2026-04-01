@@ -456,7 +456,9 @@ fun MainScreen(
             onConfirm = {
                 viewModel.deleteQuestion(question)
                 deletingQuestion = null
-            }
+            },
+            title = stringResource(R.string.delete_question),
+            message = stringResource(R.string.delete_question_confirm, question.name)
         )
     }
 }

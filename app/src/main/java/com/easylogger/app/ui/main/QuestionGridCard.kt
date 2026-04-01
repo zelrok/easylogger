@@ -49,7 +49,7 @@ fun QuestionGridCard(
     val typeBadge = if (question.answerType == "SCALE") {
         "${question.scaleMin}-${question.scaleMax}"
     } else {
-        "Text"
+        question.textOptions?.split(",")?.size?.let { "${it} options" } ?: "Text"
     }
 
     Card(
