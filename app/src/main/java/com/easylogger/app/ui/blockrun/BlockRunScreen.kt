@@ -1,6 +1,7 @@
 package com.easylogger.app.ui.blockrun
 
 import android.media.AudioManager
+import com.easylogger.app.ui.components.ScaleNumberInput
 import android.media.ToneGenerator
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.layout.Arrangement
@@ -424,7 +425,7 @@ private fun QuestionActions(
                     }
                 }
         }
-    } else {
+    } else if (question.scaleMax - question.scaleMin + 1 <= 20) {
         FlowRow(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -441,6 +442,13 @@ private fun QuestionActions(
                 }
             }
         }
+    } else {
+        ScaleNumberInput(
+            scaleMin = question.scaleMin,
+            scaleMax = question.scaleMax,
+            onSubmit = { onSubmitAnswer(it) },
+            buttonShape = buttonShape
+        )
     }
 }
 
